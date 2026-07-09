@@ -15,72 +15,42 @@ function createIcon(type, color, chara, underline = false) {
 
 // ★必要なアイコンだけ抽出（元コードと完全一致）
 
-// 通常（黒丸）
-const diviconK = createIcon('K', '', 'K');
-
-// 留守（青三角）
-const diviconRusu = createIcon('K', '#00f', 'K', true);
-
-// 会えた（緑三角）
-const diviconDone = createIcon('K', '#0f0', 'K', true);
-
-// 投函（黄色丸）←あなたの指定
-const diviconPostO = createIcon('O', '#ff0', 'O');
-
-// 備考あり（オレンジ丸）
-const diviconO = createIcon('O', '', 'O');
-
-// 差異あり・拒否（赤三角）
-const diviconR = createIcon('R', '', 'R');
+const diviconK = createIcon('K', '', 'K');          // 通常（黒丸）
+const diviconRusu = createIcon('K', '#00f', 'K', true); // 留守（青三角）
+const diviconDone = createIcon('K', '#0f0', 'K', true); // 会えた（緑三角）
+const diviconPostO = createIcon('O', '#ff0', 'O');      // 投函（黄色丸）
+const diviconO = createIcon('O', '', 'O');              // 備考あり（オレンジ丸）
+const diviconR = createIcon('R', '', 'R');              // 差異・拒否（赤三角）
 
 
 /* ============================================================
-   アイコン判定ロジック（あなたの仕様に完全一致）
+   アイコン判定ロジック（元仕様完全維持）
    ============================================================ */
 
 function getIconType(house) {
 
-    // 拒否（赤△）
-    if (house.info === "拒否" || house.recInfo === "拒否") {
-        return diviconR;
-    }
+    if (house.info === "拒否" || house.recInfo === "拒否") return diviconR;
 
-    // 投函（黄色丸）
-    if (house.rec && house.rec[0] === true && house.rec[1] === true) {
-        return diviconPostO;
-    }
+    if (house.rec && house.rec[0] === true && house.rec[1] === true) return diviconPostO;
 
-    // 会えた（緑三角）
-    if (house.rec && house.rec[0] === true && house.rec[1] === false) {
-        return diviconDone;
-    }
+    if (house.rec && house.rec[0] === true && house.rec[1] === false) return diviconDone;
 
-    // 留守（青三角）
-    if (house.rec && house.rec[0] === false && house.rec[1] === true) {
-        return diviconRusu;
-    }
+    if (house.rec && house.rec[0] === false && house.rec[1] === true) return diviconRusu;
 
-    // 備考あり（オレンジ丸）
-    if (house.remark || house.recRemark) {
-        return diviconO;
-    }
+    if (house.remark || house.recRemark) return diviconO;
 
-    // 差異あり（赤三角）
     if (
         house.info !== house.recInfo ||
         house.language !== house.recLang ||
         house.remark !== house.recRemark
-    ) {
-        return diviconR;
-    }
+    ) return diviconR;
 
-    // 通常（黒丸）
     return diviconK;
 }
 
 
 /* ============================================================
-   ポップアップ生成（テンプレート化）
+   ポップアップ生成（元仕様完全維持）
    ============================================================ */
 
 function openPopup(house, mode="info") {
@@ -192,7 +162,7 @@ function renderBody(house, mode) {
 
 
 /* ============================================================
-   マーカー生成（MakeMarkers1 / MakeMarkers2 を完全統合）
+   マーカー生成（元仕様完全維持）
    ============================================================ */
 
 function createMarker(house) {
@@ -210,7 +180,20 @@ function createMarker(house) {
 
 
 /* ============================================================
-   情報更新（GAS 書き込み＋マーカー再生成）
+   ★ GitHub 用：GAS REST API に書き込む fetch() 関数
+   ============================================================ */
+
+async function writeToGAS(house) {
+    await fetch(API_BASE, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({view, house})
+    });
+}
+
+
+/* ============================================================
+   情報更新（fetch 書き込み＋マーカー再生成）
    ============================================================ */
 
 function updateInfo(house, value) {
@@ -233,10 +216,10 @@ function saveRemark(house) {
     saveHouse(house);
 }
 
-function saveHouse(house) {
-    google.script.run.setSpreadsheetInfo(Number(view), house);
+async function saveHouse(house) {
 
-    // マーカー再生成
+    await writeToGAS(house);
+
     const index = house.num ? building.findIndex(b => b.ch === house.ch) : house.ch;
     markers.removeLayer(markers1[index] || markers2[index]);
 
