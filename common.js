@@ -99,41 +99,41 @@ function renderBody(house, mode) {
 }
 function getIconType(house) {
 
-    // 拒否（赤△）
+    // 拒否（赤△） → CSS: diviconR
     if (house.info === "拒否" || house.recInfo === "拒否") {
-        return "diviconRefuse";
+        return "diviconR";
     }
 
-    // 投函（黄色）
+    // 投函（黄色） → CSS に黄色がないので新規追加する必要あり
     if (house.rec && house.rec[0] === true && house.rec[1] === true) {
-        return "diviconYellow";
+        return "diviconYellow";  // ★後で CSS を追加する
     }
 
-    // 会えた（緑）
+    // 会えた（緑） → CSS: diviconG
     if (house.rec && house.rec[0] === true && house.rec[1] === false) {
-        return "diviconGreen";
+        return "diviconG";
     }
 
-    // 留守（青）
+    // 留守（青） → CSS: diviconB
     if (house.rec && house.rec[0] === false && house.rec[1] === true) {
-        return "diviconBlue";
+        return "diviconB";
     }
 
-    // 備考あり（オレンジ）
+    // 備考あり（オレンジ） → CSS: diviconO
     if (house.remark || house.recRemark) {
         return "diviconO";
     }
 
-    // 差異あり（赤枠）
+    // 差異あり（赤枠） → CSS: diviconOmit が赤文字黒丸だが、赤枠は diviconR で統一する？
     if (
         house.info !== house.recInfo ||
         house.language !== house.recLang ||
         house.remark !== house.recRemark
     ) {
-        return "diviconR";
+        return "diviconR";  // ★あなたの仕様では赤枠＝diviconR
     }
 
-    // 通常（黒）
+    // 通常（黒） → CSS: diviconK
     return "diviconK";
 }
 function createMarker(house) {
