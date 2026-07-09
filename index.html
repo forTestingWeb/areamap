@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
+<title>読み込み中…</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+<style>
+body { margin:0; padding:0; font-family:sans-serif; }
+#loader { text-align:center; padding-top:3em; }
+</style>
+
+</head>
+<body>
+
+<div id="loader">
+  <p>読み込み中…</p>
+</div>
+
+<script>
+const loader = document.getElementById('loader');
+const params = new URL(document.location).searchParams;
+
+let lm = params.get('lm');
+let op = params.get('op') || "";
+let dev = params.get('dev') || 0;
+let userId = "none";
+
+// GAS URL（本番・開発）
+const GAS_URL = dev == 1
+  ? "https://script.google.com/macros/s/AKfycbzzuU7E7-Syg2FrAQyBxoJS_dLqSHw0SjaUGt6YFjEtpMtapyNyVx9QjjemKdxuYo8pgg/exec"
+  : "https://script.google.com/macros/s/AKfycbyw-r2rpN2W40EabhnJf_AGtLHS4lP8NkwJpmi_VRi46e4yIMgecfl9qr3wMygB2qhx/exec";
+
+init();
+
+function init() {
+  liff.init({ liffId: "2005353358-O06e5Z4z" })
+    .then(() => {
+      if (!liff.isLoggedIn()) {
+        liff.login({ redirectUri: location.href });
+        return;
+      }
+
+      userId = liff.getDecodedIDToken().sub;
+      loader.innerHTML = "<p>認証中…</p>";
+      callGAS();
+    });
+}
+
+function callGAS() {
+  const url = `${GAS_URL}?lm=${lm}&op=${op}&id=${userId}`;
+
+  fetch(url)
+    .then(res => res.json())
+    .then(data => {
+
+      if (!data.ok) {
+        alert(data.error);
+        loader.innerHTML = `<p>${data.error}</p>`;
+        return;
+      }
+
+      // タイトル設定
+      if (op === "edit") {
+        document.title = `${data.view}番の区域の編集`;
+      } else if (data.use) {
+        document.title = `区域番号${data.use}`;
+      } else {
+        document.title = "区域の閲覧";
+      }
+
+      // ▼▼▼ あなたの希望する分岐 ▼▼▼
+
+      if (op === "edit") {
+        // 編集画面へ
+        location.href = `./edit.html?view=${data.view}&use=${data.use}&op=${data.op}&id=${data.id}`;
+        return;
+      }
+
+      if (data.use) {
+        // 使用画面へ
+        location.href = `./use.html?view=${data.view}&use=${data.use}&op=${data.op}&id=${data.id}`;
+        return;
+      }
+
+      // 閲覧画面へ
+      location.href = `./view.html?view=${data.view}&use=${data.use}&op=${data.op}&id=${data.id}`;
+    })
+    .catch(err => {
+      loader.innerHTML = "<p>通信エラー</p>";
+      console.error(err);
+    });
+}
+</script>
+
+</body>
+</html>
