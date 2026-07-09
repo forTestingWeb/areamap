@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>区域地図（GitHub版）</title>
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- LocateControl -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol/dist/L.Control.Locate.min.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol/dist/L.Control.Locate.min.js"></script>
+
+<!-- ESRI Leaflet -->
+<script src="https://unpkg.com/esri-leaflet@3.0.19/dist/esri-leaflet.js"></script>
+<script src="https://unpkg.com/esri-leaflet-vector@4.3.2/dist/esri-leaflet-vector.js"></script>
+
+<!-- leafletrotate -->
+<script src="https://cdn.jsdelivr.net/gh/forTestingWeb/forLIFF/leafletrotate.js"></script>
+
+<!-- MarkerCluster -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css">
+
+<!-- あなたの共通ロジック（GitHubのcommon.js） -->
+<script src="https://cdn.jsdelivr.net/gh/forTestingWeb/areamap/common.js"></script>
+
+<style>
+/* あなたの既存CSS（そのまま） */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { height: 100%; width: 100%; }
+body{
+  position: static;
+  transform-origin: top left;
+  -webkit-text-size-adjust: 100%;
+}
+#map { width:100vw; height:100vh; cursor:pointer; }
+
+/* アイコンCSS（あなたの既存） */
+.diviconK { display:inline-block; text-align:center; width:40px; height:40px; line-height:40px;
+  border-radius:50%; color:#fff; background:#333; opacity:0.6; font-size:24px; }
+.diviconB { display:inline-block; text-align:center; width:40px; height:40px; line-height:40px;
+  border-radius:50%; color:#fff; background:#00f; opacity:0.6; font-size:24px; font-weight:bold; }
+.diviconG { display:inline-block; text-align:center; width:40px; height:40px; line-height:40px;
+  border-radius:50%; color:#fff; background:#0f0; opacity:0.6; font-size:24px; font-weight:bold; }
+.diviconO { display:inline-block; text-align:center; width:40px; height:40px; line-height:40px;
+  border-radius:50%; color:#fff; background:#f90; opacity:0.6; font-size:24px; }
+.diviconR { display:inline-block; text-align:center; width:45px; height:40px; line-height:52px;
+  color:#fff; background:#f00; opacity:0.6; font-size:24px; font-weight:bold;
+  clip-path:polygon(50% 0%,0% 100%,100% 100%); }
+.diviconPostO {
+  display:inline-block; text-align:center; width:40px; height:40px; line-height:40px;
+  border-radius:50%; color:#000; background:#ff0; opacity:0.8; font-size:24px; font-weight:bold;
+}
+</style>
+
+</head>
+<body>
+
+<div id="map"></div>
+
+<script>
+/* ============================================================
+   ★ iOS 判定（元の仕様）
+   ============================================================ */
+var ua = navigator.userAgent;
+var isApple = (ua.indexOf('iPhone') > 0 || ua.indexOf('iPad') > 0) ? 1 : 0;
+
+/* ============================================================
+   ★ GAS REST API の URL（あなたの Web アプリ URL）
+   ============================================================ */
+const API_BASE = "https://script.google.com/macros/s/AKfycbx5CRB-fVU7AVhW9as93iEkTnhxjkZ768ESZMa7z9x5ia1gTZCmJAE2M8zGyPzvLEWlEQ/exec";
+
+/* ============================================================
+   ★ 地理院タイル（元の仕様）
+   ============================================================ */
+var gsi = L.tileLayer(
+  'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',
+  {maxZoom: 20, maxNativeZoom: 18}
+);
+
+var gsiPhoto = L.tileLayer(
+  'https://cyberjapandata.gsi.go.jp/xyz/ort/{z}/{x}/{y}.jpg',
+  {maxZoom: 20, maxNativeZoom: 18}
+);
+
+/* ============================================================
+   ★ ESRI タイル（元の仕様）
+   ============================================================ */
+const accessToken = "AAPTaKi42auMjru6RATN1elk7tA..ZpuolyHcDDDnusbaaY1YCcKiAuSXFSa-lvJIbwjx8rIPH-Jm0LuhNn-HZ-yn2speuDq5lSmSRm4hIA8osWaRHIfwAluAs3lA0HyLdizaBpPiYXIvpYx-3VoqBTSFJXBBcRRPXLSZlgiYz2CKNPxbpsrIZyVKbJpoBKHs7Peo1oVVI2G8HcwZCmX1KZT2iV4fXZgZ-3p4a4bffJ304hH6KeD5eLG-HtGnfbd8vngPPo2lqKgTwHqm3zk3bJA.AT1_wtQrbBJO";
+
+const topo = L.esri.basemapLayer('Topographic', {maxZoom:20, maxNativeZoom:19, language:"ja", token:accessToken});
+const image = L.esri.basemapLayer('Imagery', {maxZoom:20, maxNativeZoom:19, language:"ja", token:accessToken});
+const esri = L.esri.Vector.vectorBasemapLayer("arcgis/navigation", {language:"ja", token:accessToken});
+const imagery = L.esri.Vector.vectorBasemapLayer("arcgis/imagery", {language:"ja", token:accessToken});
+
+/* ============================================================
+   ★ 初期位置（元の仕様）
+   ============================================================ */
+var mpoint = [34.900952022350194,137.16462091077698];
+
+/* ============================================================
+   ★ 地図初期化（元の仕様）
+   ============================================================ */
+var Map_b = {
+  "地理院地図" : gsi,
+  "地理院衛星写真" : gsiPhoto,
+  "ESRI地図": topo,
+  "ESRI衛星写真" : image,
+  "テスト中地図": esri,
+  "テスト中衛星": imagery
+};
+
+var map = L.map('map', {
+  zoomControl: false,
+  tap: false,
+  preferCanvas: true,
+  rotate: true,
+  touchRotate: false,
+  rotateControl: {closeOnZeroBearing: false},
+  bearing: 0,
+}).setView(mpoint, 13);
+
+L.control.scale({imperial:false}).addTo(map);
+map.attributionControl.setPrefix('Leaflet');
+
+L.control.zoom({ position:'bottomleft' }).addTo(map);
+L.control.layers(Map_b, null, { collapsed: true }).addTo(map);
+
+gsi.addTo(map);
+
+/* ============================================================
+   ★ 現在地表示（元の仕様）
+   ============================================================ */
+var lc = L.control.locate({
+  position: 'topleft',
+  strings: {title:"現在地を表示", popup:"現在この付近にいます"},
+  locateOptions: {maxZoom:16}
+}).addTo(map);
+
+/* ============================================================
+   ★ マーカー管理（元の仕様）
+   ============================================================ */
+var markers = L.layerGroup().addTo(map);
+var markers1 = [];
+var markers2 = [];
+
+var house1 = [];
+var building = [];
+
+/* ============================================================
+   ★ GAS からデータを fetch() で読み込む（元の仕様）
+   ============================================================ */
+async function loadData(view) {
+    const url = `${API_BASE}?view=${view}`;
+    const res = await fetch(url);
+    return await res.json();
+}
+
+/* ============================================================
+   ★ 初期ロード（元の仕様）
+   ============================================================ */
+const view = new URLSearchParams(location.search).get("view") || 1;
+
+loadData(view).then(data => {
+    house1 = data.house1;
+    building = data.building;
+
+    for (let i = 0; i < house1.length; i++) {
+        if (house1[i].latlng) markers1[i] = createMarker(house1[i]);
+    }
+
+    for (let j = 0; j < building.length; j++) {
+        if (building[j].latlng) markers2[j] = createMarker(building[j]);
+    }
+});
+
+/* ============================================================
+   ★ GAS へ書き込み（fetch POST）元の仕様を維持
+   ============================================================ */
+async function saveHouseToGAS(house) {
+    await fetch(API_BASE, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({view, house})
+    });
+}
+
+/* ============================================================
+   ★ 元の仕様：common.js の saveHouse() を上書き
+   ============================================================ */
+window.saveHouse = async function(house) {
+
+    await saveHouseToGAS(house);
+
+    const index = house.num ? building.findIndex(b => b.ch === house.ch) : house.ch;
+    markers.removeLayer(markers1[index] || markers2[index]);
+
+    const marker = createMarker(house);
+
+    if (!house.num) markers1[index] = marker;
+    else markers2[index] = marker;
+};
+</script>
+
+</body>
+</html>
