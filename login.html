@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ログイン</title>
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #eee;
+  color: #5e5e5e;
+  font: 400 87.5%/1.5em 'Open Sans', sans-serif;
+  padding: 1em;
+}
+.form-wrapper {
+  background: #eee;
+  padding: 0 1em;
+}
+h1 {
+  text-align: center;
+  padding: 1em 0;
+}
+form {
+  padding: 0 1.5em;
+}
+.form-item {
+  margin-bottom: 0.75em;
+  width: 100%;
+}
+.form-item input {
+  background: #fff;
+  border: none;
+  border-bottom: 2px solid #eee;
+  color: #666;
+  font-size: 1em;
+  height: 50px;
+  width: 100%;
+}
+.form-item input:focus {
+  border-bottom: 2px solid #c0c0c0;
+  outline: none;
+}
+.button-panel {
+  margin: 2em 0 0;
+  width: 100%;
+}
+.button-panel .button {
+  background: #f16272;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  height: 50px;
+  font-size: 1.2em;
+  text-align: center;
+  width: 100%;
+}
+.form-footer {
+  font-size: 1em;
+  padding: 2em 0;
+  text-align: center;
+}
+</style>
+</head>
+
+<body>
+<div class="form-wrapper">
+  <h1 id="title"></h1>
+  <h1>ログイン</h1>
+  <p>　最終ログイン後10日間はパスワード自動入力。</p>
+
+  <form id="loginForm">
+    <div class="form-item">
+      <input type="password" id="pw" placeholder="パスワード">
+    </div>
+    <div class="button-panel">
+      <input type="button" class="button" id="loginBtn" value="ログイン">
+    </div>
+  </form>
+
+  <div class="form-footer">
+    <p id="ios1"></p>
+  </div>
+</div>
+
+<script>
+// URLパラメータ取得
+const params = new URL(document.location).searchParams;
+const view = params.get("view") || 0;
+const use  = params.get("use")  || 0;
+const op   = params.get("op")   || "";
+
+// タイトル設定（旧仕様を再現）
+let title = "";
+if (op === "edit") {
+  title = `${view}番の区域の編集`;
+} else if (use !== "0") {
+  title = `区域番号${use}`;
+} else {
+  title = "区域の閲覧";
+}
+document.getElementById("title").innerText = title;
+
+// GAS doPost API URL
+const GAS_POST_URL =
+  "https://script.google.com/macros/s/AKfycbyw-r2rpN2W40EabhnJf_AGtLHS4lP8NkwJpmi_VRi46e4yIMgecfl9qr3wMygB2qhx/exec";
+
+// IndexedDB 設定
+var db;
+var indexedDB = window.indexedDB || window.mozIndexedDB || window.msIndexedDB;
+var date = new Date();
+
+// IndexedDB 初期化
+function ready(){
+  if (indexedDB) {
+    var openRequest = indexedDB.open("areaDb", 1.0);
+    openRequest.onupgradeneeded = function(event) {
+      db = event.target.result;
+      db.createObjectStore("areaStore", { keyPath: "type"});
+    };
+    openRequest.onsuccess = function(event) {
+      db = event.target.result;
+      loadPw();
+    };
+  }
+}
+ready();
+
+// パスワード読み込み
+function loadPw() {
+  var transaction = db.transaction(["areaStore"], "readwrite");
+  var store = transaction.objectStore("areaStore");
+  var request = store.openCursor();
+  request.onsuccess = function (event) {
+    var cursor = event.target.result;
+    if (!cursor) return;
+
+    var cv = cursor.value;
+    if (cv.type === "pw") {
+      if (cv.data.date > Date.parse(date) - 1000*60*60*24*10) {
+        document.getElementById('pw').value = cv.data.memo;
+      }
+    }
+    cursor.continue();
+  };
+}
+
+// パスワード保存
+function savePw(v) {
+  var d = String(Date.parse(date));
+  var transaction = db.transaction(["areaStore"], "readwrite");
+  var store = transaction.objectStore("areaStore");
+  store.put({ type:"pw", data:{date:d, memo:v} });
+}
+
+// Apple 警告
+var ua = navigator.userAgent;
+var isApple = (ua.indexOf('iPhone') > 0 || ua.indexOf('iPad') > 0);
+document.getElementById('ios1').innerText =
+  isApple ? "Appleの機器では、仕様によりパスワードとメモが数日以内に消去されます。" : "";
+
+// ▼▼▼ ログイン処理（GAS doPost API を fetch） ▼▼▼
+document.getElementById("loginBtn").onclick = function() {
+  const pw = document.getElementById("pw").value;
+  savePw(pw);
+
+  fetch(GAS_POST_URL, {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({
+      password: pw,
+      view: view,
+      use: use,
+      op: op,
+      isApple: isApple ? 1 : 0
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (!data.ok) {
+      alert("パスワードが違います");
+      return;
+    }
+
+    // ▼▼▼ ログイン成功 → 外側の画面へ ▼▼▼
+    if (op === "edit") {
+      location.href = `./edit.html?view=${view}&use=${use}&op=${op}`;
+    } else if (use !== "0") {
+      location.href = `./use.html?view=${view}&use=${use}&op=${op}`;
+    } else {
+      location.href = `./view.html?view=${view}&use=${use}&op=${op}`;
+    }
+  })
+  .catch(err => {
+    alert("通信エラー");
+    console.error(err);
+  });
+};
+</script>
+
+</body>
+</html>
