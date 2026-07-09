@@ -1,3 +1,88 @@
+/* ============================================================
+   アイコン生成（元コードの createIcon を完全復元）
+   ============================================================ */
+
+function createIcon(type, color, chara, underline = false) {
+  const fontTag = underline
+      ? `<font color="${color}"><u>${chara}</u></font>`
+      : `<font color="${color}">${chara}</font>`;
+  return L.divIcon({
+      html: `<div>${fontTag}</div>`,
+      iconSize: [40, 40],
+      iconAnchor: [20, 20]
+  });
+}
+
+// ★必要なアイコンだけ抽出（元コードと完全一致）
+
+// 通常（黒丸）
+const diviconK = createIcon('K', '', 'K');
+
+// 留守（青三角）
+const diviconRusu = createIcon('K', '#00f', 'K', true);
+
+// 会えた（緑三角）
+const diviconDone = createIcon('K', '#0f0', 'K', true);
+
+// 投函（黄色丸）←あなたの指定
+const diviconPostO = createIcon('O', '#ff0', 'O');
+
+// 備考あり（オレンジ丸）
+const diviconO = createIcon('O', '', 'O');
+
+// 差異あり・拒否（赤三角）
+const diviconR = createIcon('R', '', 'R');
+
+
+/* ============================================================
+   アイコン判定ロジック（あなたの仕様に完全一致）
+   ============================================================ */
+
+function getIconType(house) {
+
+    // 拒否（赤△）
+    if (house.info === "拒否" || house.recInfo === "拒否") {
+        return diviconR;
+    }
+
+    // 投函（黄色丸）
+    if (house.rec && house.rec[0] === true && house.rec[1] === true) {
+        return diviconPostO;
+    }
+
+    // 会えた（緑三角）
+    if (house.rec && house.rec[0] === true && house.rec[1] === false) {
+        return diviconDone;
+    }
+
+    // 留守（青三角）
+    if (house.rec && house.rec[0] === false && house.rec[1] === true) {
+        return diviconRusu;
+    }
+
+    // 備考あり（オレンジ丸）
+    if (house.remark || house.recRemark) {
+        return diviconO;
+    }
+
+    // 差異あり（赤三角）
+    if (
+        house.info !== house.recInfo ||
+        house.language !== house.recLang ||
+        house.remark !== house.recRemark
+    ) {
+        return diviconR;
+    }
+
+    // 通常（黒丸）
+    return diviconK;
+}
+
+
+/* ============================================================
+   ポップアップ生成（テンプレート化）
+   ============================================================ */
+
 function openPopup(house, mode="info") {
     const latlng = JSON.parse(house.latlng);
     const html = renderPopup(house, mode);
@@ -7,6 +92,7 @@ function openPopup(house, mode="info") {
         .setContent(html)
         .openOn(map);
 }
+
 function renderPopup(house, mode) {
     return `
         <div class="popup-container" style="font-size:16px; line-height:1.4;">
@@ -18,6 +104,7 @@ function renderPopup(house, mode) {
         </div>
     `;
 }
+
 function renderHeader(house) {
     const label = house.num
         ? `${house.ch}-${house.num}号室`
@@ -29,6 +116,7 @@ function renderHeader(house) {
         </div>
     `;
 }
+
 function renderTabs(house, mode) {
     const tabs = [
         {id:"info",   label:"情報"},
@@ -55,6 +143,7 @@ function renderTabs(house, mode) {
         </div>
     `;
 }
+
 function renderInfoSection(house) {
     const items = ["拒否","手話","JW","空家","倉庫","欠番"];
 
@@ -69,6 +158,7 @@ function renderInfoSection(house) {
         <button onclick="updateInfo(house,'')" style="margin:3px;">削除</button>
     `;
 }
+
 function renderLanguageSection(house) {
     const langs = ["英語","中国語","韓国語","ポル語","スペ語","ベト語","タガ語","その他"];
 
@@ -83,12 +173,14 @@ function renderLanguageSection(house) {
         <button onclick="updateLang(house,0)" style="margin:3px;">削除</button>
     `;
 }
+
 function renderRemarkSection(house) {
     return `
         <textarea id="remark" style="width:95%; height:80px;">${house.recRemark}</textarea><br>
         <button onclick="saveRemark(house)" style="margin-top:6px;">保存</button>
     `;
 }
+
 function renderBody(house, mode) {
     switch(mode) {
         case "info":   return renderInfoSection(house);
@@ -97,62 +189,30 @@ function renderBody(house, mode) {
         default:       return renderInfoSection(house);
     }
 }
-function getIconType(house) {
 
-    // 拒否（赤△） → CSS: diviconR
-    if (house.info === "拒否" || house.recInfo === "拒否") {
-        return "diviconR";
-    }
 
-    // 投函（黄色） → CSS に黄色がないので新規追加する必要あり
-    if (house.rec && house.rec[0] === true && house.rec[1] === true) {
-        return "diviconYellow";  // ★後で CSS を追加する
-    }
+/* ============================================================
+   マーカー生成（MakeMarkers1 / MakeMarkers2 を完全統合）
+   ============================================================ */
 
-    // 会えた（緑） → CSS: diviconG
-    if (house.rec && house.rec[0] === true && house.rec[1] === false) {
-        return "diviconG";
-    }
-
-    // 留守（青） → CSS: diviconB
-    if (house.rec && house.rec[0] === false && house.rec[1] === true) {
-        return "diviconB";
-    }
-
-    // 備考あり（オレンジ） → CSS: diviconO
-    if (house.remark || house.recRemark) {
-        return "diviconO";
-    }
-
-    // 差異あり（赤枠） → CSS: diviconOmit が赤文字黒丸だが、赤枠は diviconR で統一する？
-    if (
-        house.info !== house.recInfo ||
-        house.language !== house.recLang ||
-        house.remark !== house.recRemark
-    ) {
-        return "diviconR";  // ★あなたの仕様では赤枠＝diviconR
-    }
-
-    // 通常（黒） → CSS: diviconK
-    return "diviconK";
-}
 function createMarker(house) {
     const latlng = JSON.parse(house.latlng);
-    const iconType = getIconType(house);
+    const icon = getIconType(house);
 
-    const icon = L.divIcon({
-        html: `<div class="${iconType}">${house.num ? house.num : house.ch}</div>`,
-        iconSize: [0,0],
-        iconAnchor: [20,20]
-    });
+    const marker = L.marker(latlng, {icon}).bindPopup(
+        renderPopup(house, "info"),
+        {maxWidth:1200}
+    );
 
-    const popupHtml = renderPopup(house, "info");
-
-    const marker = L.marker(latlng, {icon}).bindPopup(popupHtml, {maxWidth:1200});
     markers.addLayer(marker);
-
     return marker;
 }
+
+
+/* ============================================================
+   情報更新（GAS 書き込み＋マーカー再生成）
+   ============================================================ */
+
 function updateInfo(house, value) {
     house.info = value;
     house.recInfo = value;
@@ -172,6 +232,7 @@ function saveRemark(house) {
     house.recRemark = v;
     saveHouse(house);
 }
+
 function saveHouse(house) {
     google.script.run.setSpreadsheetInfo(Number(view), house);
 
