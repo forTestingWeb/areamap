@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>エラー</title>
+<style>
+body {
+  font-family: sans-serif;
+  background: #f8f8f8;
+  padding: 2em;
+  text-align: center;
+  color: #444;
+}
+h1 {
+  font-size: 1.6em;
+  margin-bottom: 1em;
+}
+p {
+  font-size: 1.2em;
+}
+</style>
+</head>
+<body>
+
+<h1 id="msg">エラー</h1>
+<p>もう一度やり直してください。</p>
+
+<script>
+// URLパラメータから text を取得
+const params = new URL(document.location).searchParams;
+const text = params.get("text") || "エラーが発生しました";
+
+// 表示
+document.getElementById("msg").innerText = text + "…";
+</script>
+
+</body>
+</html>
