@@ -2,15 +2,46 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>マップ</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.1.3/dist/maplibre-gl.css" />
 <script src="https://unpkg.com/maplibre-gl@4.1.3/dist/maplibre-gl.js"></script>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+// 24時間経過で閉じる。できなければ非表示。
+const limitMs = 24 * 60 * 60 * 1000;
+setTimeout(() => {
+  document.body.innerHTML = "";
+  alert("24時間が経過したため、画面を消去します。この地図を引き続き使用する場合は、LINEのトーク画面から開きなおしてください。");
+  window.close();
+  if (typeof liff !== "undefined" && liff.closeWindow) {
+    liff.closeWindow();
+  }
+}, limitMs);
 
+// ピンチイン・ピンチアウト禁止
+document.documentElement.addEventListener('touchstart', function (e) {
+  if (e.touches.length >= 2) e.preventDefault();
+}, { passive: false });
+
+// ダブルタップ拡大禁止
+let lastTouchTime = 0;
+document.documentElement.addEventListener('touchend', function (e) {
+  const now = new Date().getTime();
+  if (now - lastTouchTime < 350) e.preventDefault();
+  lastTouchTime = now;
+}, false);
+</script>
 <style>
-html, body { margin:0; padding:0; height:100%; width:100%; font-size:18px; }
+html, body { margin:0; padding:0; height:100%; width:100%; font-size:18px; font-family: sans-serif; }
 #map { position:absolute; top:0; left:0; width:100%; height:100%; }
+
+/* ローダー表示 */
+#loader {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.7); color: white; padding: 15px 25px;
+  border-radius: 8px; font-size: 16px; z-index: 1000; display: block; pointer-events: none;
+}
 
 .layer-control {
   position:absolute; top:10px; right:10px;
@@ -71,12 +102,11 @@ html, body { margin:0; padding:0; height:100%; width:100%; font-size:18px; }
 
 <body>
 <div id="map"></div>
+<div id="loader">データを読み込み中...</div>
 <div id="copyright">© 国土地理院</div>
-
 <button id="geolocateBtn" class="custom-geolocate-btn" title="現在地">
   <svg viewBox="0 0 24 24"><path d="M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4Z"/></svg>
 </button>
-
 <div class="layer-control">
   <div class="layer-control-header" id="layerHeader">地理院地図 ▼</div>
   <div class="layer-control-content">
@@ -87,9 +117,79 @@ html, body { margin:0; padding:0; height:100%; width:100%; font-size:18px; }
 </div>
 
 <script>
+const params = new URL(document.location).searchParams;
+let lm = "", op = "", id = "", url = "";
+let userId = "none";
+let flag = params.get('flag') ? Number(params.get('flag')) : 0;
+let iOSflag = params.get('iOSflag') ? 1 : 0;
+let ext = params.get('ext');
+const ua = navigator.userAgent;
+
+const loader = document.getElementById("loader");
+
+init();
+
+function init() {
+  liff.init({ liffId: "2005353358-O06e5Z4z" }).then(() => {
+    if (liff.isInClient()) {
+      // 外部ブラウザで開くオプション
+      if (ext === "true") {
+        const location = document.location + "&ext=true";
+        liff.openWindow({ url: location, external: true });
+        liff.closeWindow();
+        document.title = "このウィンドウは閉じてください。";
+        return;
+      }
+      liff.ready.then(() => {
+        if (ua.indexOf('iPad') > 0 && !iOSflag) {
+          const location = document.location + "&iOSflag=1";
+          liff.openWindow({ url: location, external: false });
+          document.title = "このウィンドウは閉じてください。";
+          return;
+        }
+        if (!liff.isLoggedIn()) liff.login();
+        if (liff.getDecodedIDToken()) {
+          userId = liff.getDecodedIDToken().sub;
+        }
+        jump();
+      });
+    } else {
+      if (liff.isLoggedIn()) {
+        if (liff.getDecodedIDToken()) {
+          userId = liff.getDecodedIDToken().sub;
+        }
+      } else if (!flag) {
+        const ret = window.confirm("LINEでログインされていません。\n登録済みの場合、ログインするとパスワード入力が不要になります。\nログインしますか？");
+        if (ret) {
+          flag = 1;
+          const location = document.location + "&flag=1";
+          liff.login({ redirectUri: location });
+          return;
+        } else {
+          userId = prompt("パスワードを入力してください", "") || "none";
+        }
+      }
+      jump();
+    }
+  }).catch(err => {
+    console.error("LIFF 初期化エラー:", err);
+    jump(); // LIFFなし環境へのフォールバック
+  });
+}
+
+function jump() {
+  if (params.get('lm')) {
+    lm = "lm=" + params.get('lm');
+    if (params.get('op')) op = "&op=" + params.get('op');
+    id = "&id=" + encodeURIComponent(userId);
+    url = "https://script.google.com/macros/s/AKfycby-Gfboni8-IO-zIGbKdpR7V-WZ_di4aHomZHlBbGOfEaCRzO1Wpi6kIgsuxrbqwDmhxw/exec?" + lm + op + id;
+  }
+  loadDataFromGAS();
+}
+
 // コントロール開閉
 const header = document.getElementById("layerHeader");
-document.querySelector(".layer-control-header").onclick = () => {
+header.onclick = () => {
   const content = document.querySelector(".layer-control-content");
   const visible = content.style.display === "block";
   content.style.display = visible ? "none" : "block";
@@ -112,7 +212,7 @@ const copyrightMap = {
 document.querySelectorAll("input[name=basemap]").forEach(r => {
   r.addEventListener("change", () => {
     const v = r.value;
-    const nameMap = { gsi: "国土地理院", esri: "Esri地図", esri_sat: "Esri衛星" };
+    const nameMap = { gsi: "地理院地図", esri: "Esri地図", esri_sat: "Esri衛星" };
     header.dataset.title = nameMap[v];
     document.querySelector(".layer-control-content").style.display = "none";
     header.textContent = `${nameMap[v]} ▼`;
@@ -124,7 +224,7 @@ document.querySelectorAll("input[name=basemap]").forEach(r => {
   });
 });
 
-// マーカー画像生成
+// マーカー画像生成（clearRectを追加して重なりを解消）
 function createMarkerImage(shape, text, textColor, bgColor, opacity = 1.0) {
   const cacheKey = `${shape}_${text}_${textColor}_${bgColor}_${opacity}`;
   if (imageCache[cacheKey]) return Promise.resolve(imageCache[cacheKey]);
@@ -143,6 +243,7 @@ function createMarkerImage(shape, text, textColor, bgColor, opacity = 1.0) {
       const canvas = document.createElement('canvas');
       canvas.width = 48; canvas.height = 48;
       const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, 48, 48); // クリア処理
       ctx.drawImage(img, 0, 0);
       const imgData = ctx.getImageData(0, 0, 48, 48);
       imageCache[cacheKey] = imgData;
@@ -194,11 +295,12 @@ function updatePolygonSource() {
 }
 
 function addMarker(shape, lng, lat, text="", textColor = "#ffffff", bgColor = "#000000", popupTitle = "", popupText = "", opacity = 1.0, showButtons = true) {
-  markerFeatures.push({ shape, lng, lat, text: String(text), textColor, currentTextColor: textColor, bgColor, currentBgColor: bgColor, popupTitle, popupText, opacity, showButtons });
+  markerFeatures.push({ 
+    shape, lng, lat, text: String(text), textColor, currentTextColor: textColor, 
+    bgColor, currentBgColor: bgColor, popupTitle, popupText, opacity, showButtons 
+  });
   if (isMapLoaded) updateMarkerSource();
 }
-const addCircleMarker = (lng, lat, ...args) => addMarker("circle", lng, lat, ...args);
-const addTriangleMarker = (lng, lat, ...args) => addMarker("triangle", lng, lat, ...args);
 
 function addPolygon(coords, color = "#ff0000", fillOpacity = 0.3) {
   polygonFeatures.push({ coordinates: coords, color, fillOpacity });
@@ -348,22 +450,59 @@ window.openSubPopup = function(index) {
   }, 50);
 };
 
+// 色・ステータスの変更とGASへのデータ同期
 window.changeColor = function(index, type, code) {
   const item = markerFeatures[index];
   if (!item) return;
   if (type === 'text') item.currentTextColor = code === 'reset' ? item.textColor : code;
   if (type === 'bg') item.currentBgColor = code === 'reset' ? item.bgColor : code;
   updateMarkerSource();
+
+  sendDataToGAS({
+    action: "updateColor",
+    index: index,
+    type: type,
+    color: code,
+    userId: userId
+  });
 };
 
+// 備考テキストの保存とGASへのデータ同期
 window.saveText = function(index) {
   const ta = document.getElementById(`editText-${index}`);
   if (ta) {
-    markerFeatures[index].popupText = ta.value;
+    const newText = ta.value;
+    markerFeatures[index].popupText = newText;
     updateMarkerSource();
-    alert("備考を保存しました");
+    
+    sendDataToGAS({
+      action: "updateText",
+      index: index,
+      popupText: newText,
+      userId: userId
+    }).then(() => {
+      alert("備考を保存しました");
+    }).catch(() => {
+      alert("通信エラーが発生しました。保存に失敗した可能性があります。");
+    });
   }
 };
+
+// GASへデータを保存するPOST関数
+async function sendDataToGAS(payload) {
+  if (!url) return;
+  try {
+    await fetch(url, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  } catch (err) {
+    console.error("GASへの保存送信エラー:", err);
+    throw err;
+  }
+}
 
 // 現在地・追従
 let watchId = null, isTracking = false;
@@ -405,8 +544,7 @@ function applyGasData(data) {
 }
 
 async function loadDataFromGAS() {
-  const GAS_URL = "YOUR_GAS_WEB_APP_URL_HERE";
-  if (!GAS_URL || GAS_URL.includes("YOUR_GAS_WEB_APP_URL")) {
+  if (!url) {
     pendingGasData = {
       title: "【ダミーデータ】岡崎市エリアマップ",
       markers: [
@@ -420,18 +558,20 @@ async function loadDataFromGAS() {
       ]
     };
     if (isMapLoaded) applyGasData(pendingGasData);
+    if (loader) loader.style.display = "none";
     return;
   }
+  
   try {
-    const res = await fetch(GAS_URL);
+    const res = await fetch(url);
     pendingGasData = await res.json();
     if (isMapLoaded) applyGasData(pendingGasData);
   } catch (err) {
     console.error("GASデータの取得に失敗しました:", err);
+  } finally {
+    if (loader) loader.style.display = "none";
   }
 }
-
-loadDataFromGAS();
 </script>
 </body>
 </html>
