@@ -213,12 +213,12 @@ window.map = new maplibregl.Map({
     sources: {
       "gsi-map": { type: "raster", tiles: ["https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 18 },
       "esri-map": { type: "raster", tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, maxzoom: 19 },
-      "esri-sat": { type: "raster", tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, maxzoom: 19 }
+      "esri_sat-map": { type: "raster", tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, maxzoom: 19 }
     },
     layers: [
       { id: "gsi-map-layer", type: "raster", source: "gsi-map" },
       { id: "esri-map-layer", type: "raster", source: "esri-map", layout: { visibility: "none" } },
-      { id: "esri-sat-layer", type: "raster", source: "esri-sat", layout: { visibility: "none" } }
+      { id: "esri_sat-map-layer", type: "raster", source: "esri_sat-map", layout: { visibility: "none" } }
     ]
   },
   center: [137.157311, 34.925595], zoom: 15, maxZoom: 19, maplibreLogo: false
