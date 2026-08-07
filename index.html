@@ -106,9 +106,9 @@ html, body { margin:0; padding:0; height:100%; width:100%; font-size:18px; }
 </button>
 
 <div class="layer-control">
-  <div class="layer-control-header" id="layerHeader">国土地理院 ▼</div>
+  <div class="layer-control-header" id="layerHeader">地理院地図 ▼</div>
   <div class="layer-control-content">
-    <label><input type="radio" name="basemap" value="gsi" checked> 国土地理院</label>
+    <label><input type="radio" name="basemap" value="gsi" checked> 地理院地図</label>
     <label><input type="radio" name="basemap" value="esri"> Esri地図</label>
     <label><input type="radio" name="basemap" value="esri_sat"> Esri衛星</label>
   </div>
@@ -121,7 +121,7 @@ document.querySelector(".layer-control-header").onclick = () => {
   const header = document.querySelector(".layer-control-header");
   const visible = content.style.display === "block";
   content.style.display = visible ? "none" : "block";
-  const current = header.dataset.title || "国土地理院";
+  const current = header.dataset.title || "地理院地図";
   header.textContent = visible ? `${current} ▼` : `${current} ▲`;
 };
 
@@ -145,11 +145,14 @@ const header = document.getElementById("layerHeader");
 document.querySelectorAll("input[name=basemap]").forEach(r => {
   r.addEventListener("change", () => {
     const v = r.value;
-    const nameMap = { gsi: "国土地理院", esri: "Esri 地図", esri_sat: "Esri衛星" };
+    const nameMap = { gsi: "国土地理院", esri: "Esri地図", esri_sat: "Esri衛星" };
     header.dataset.title = nameMap[v];
     const content = document.querySelector(".layer-control-content");
-    const visible = content.style.display === "block";
-    header.textContent = visible ? `${nameMap[v]} ▲` : `${nameMap[v]} ▼`;
+    
+    // 選択時に強制的にリストを非同期で閉じ、表示を「▼」に戻す
+    content.style.display = "none";
+    header.textContent = `${nameMap[v]} ▼`;
+
     copyright.textContent = copyrightMap[v];
 
     map.setLayoutProperty("gsi-map-layer", "visibility", v === "gsi" ? "visible" : "none");
@@ -536,7 +539,6 @@ function applyGasData(data) {
   if (data.polygons) {
     data.polygons.forEach(p => addPolygon(p.coords, p.color, p.opacity));
   }
-  // 全データの読み込みと描画準備が終わったタイミングで全体が収まるようにズーム調整
   fitMapBounds();
 }
 
