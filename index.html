@@ -307,6 +307,34 @@ map.on("load", () => {
   if (pendingGasData) applyGasData(pendingGasData);
 });
 
+// 全マーカーとポリゴンが収まるように初期表示を自動調整する関数
+function fitMapBounds() {
+  const bounds = new maplibregl.LngLatBounds();
+  let hasData = false;
+
+  markerFeatures.forEach(m => {
+    bounds.extend([m.lng, m.lat]);
+    hasData = true;
+  });
+
+  polygonFeatures.forEach(p => {
+    if (p.coordinates && Array.isArray(p.coordinates)) {
+      p.coordinates.forEach(coord => {
+        bounds.extend(coord);
+        hasData = true;
+      });
+    }
+  });
+
+  if (hasData) {
+    map.fitBounds(bounds, {
+      padding: 50,
+      maxZoom: 17,
+      duration: 0
+    });
+  }
+}
+
 // 元のポップアップを開く関数
 window.openMainPopup = function(index, lng, lat) {
   const item = markerFeatures[index];
@@ -378,7 +406,7 @@ window.openSubPopup = function(index, lng, lat) {
       <div style="margin-top: 8px;">
         <label for="langSelect-${index}" style="font-size: 14px; font-weight: bold; display: block; margin-bottom: 4px;">言語の選択</label>
         <select id="langSelect-${index}" onchange="handleLangChange(${index}, this.value)" style="width: 100%; padding: 6px; font-size: 16px; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">
-          <option value="" selected>報告しない（今の言語を維持）</option>
+          <option value="" selected>報告しない</option>
           <option value="#ff9900">英語</option>
           <option value="#ff9900">中国語</option>
           <option value="#ff9900">ポル語</option>
@@ -400,6 +428,7 @@ window.openSubPopup = function(index, lng, lat) {
     <textarea id="editPopupText-${index}" oninput="autoResizeTextarea(this)" style="width: 100%; min-height: 40px; font-size: 14px; padding: 4px; box-sizing: border-box; resize: none; overflow: hidden;">${currentText}</textarea>
     <div style="margin-top: 6px;">
       <button onclick="savePopupText(${index})" style="padding: 4px 10px; font-size: 12px; background: #0078d4; color: #fff; border: none; border-radius: 3px; cursor: pointer;">保存</button>
+    </div>
     <hr>
     <div style="margin-top: 6px; display: flex; justify-content: flex-end;">
       <button onclick="openMainPopup(${index}, ${lng}, ${lat})" style="padding: 4px 10px; font-size: 12px; background: #f0f0f0; color: #333; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">戻る</button>
@@ -507,6 +536,8 @@ function applyGasData(data) {
   if (data.polygons) {
     data.polygons.forEach(p => addPolygon(p.coords, p.color, p.opacity));
   }
+  // 全データの読み込みと描画準備が終わったタイミングで全体が収まるようにズーム調整
+  fitMapBounds();
 }
 
 async function loadDataFromGAS() {
