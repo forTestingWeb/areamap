@@ -28,7 +28,6 @@ html, body { margin:0; padding:0; height:100%; width:100%; font-size:18px; }
 .maplibregl-popup { max-width:320px !important; }
 .maplibregl-popup-content { font-size:16px; max-height:600px; overflow-y:auto; padding:15px 10px 10px 10px; }
 
-/* ポップアップ内のカラーボタン用スタイル */
 .popup-color-btns {
   margin-top: 8px;
   display: flex;
@@ -46,47 +45,21 @@ html, body { margin:0; padding:0; height:100%; width:100%; font-size:18px; }
 .btn-green { background: #00ff00; color: #000000; border-color: #1e7e34; }
 .btn-blue { background: #0000ff; color: #ffffff; border-color: #0056b3; }
 .btn-yellow { background: #ffff00; color: #000000; border-color: #d39e00; }
-.btn-reset { background: #ffffff; color: #333333; border-color: #ccc; }
-
 .btn-red { background: #ff0000; color: #ffffff; border-color: #cc0000; }
 .btn-orange { background: #ff9900; color: #000000; border-color: #cc7a00; }
 .btn-purple { background: #800080; color: #ffffff; border-color: #590059; }
-.btn-bg-reset { background: #ffffff; color: #333333; border-color: #ccc; }
+.btn-reset, .btn-bg-reset { background: #ffffff; color: #333333; border-color: #ccc; }
+.popup-color-btns button:hover { opacity: 0.85; }
 
-.popup-color-btns button:hover {
-  opacity: 0.85;
-}
-
-/* 自作の現在地ボタンのデザイン */
 .custom-geolocate-btn {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 10;
-  background: white;
-  border: none;
-  border-radius: 4px;
-  width: 36px;
-  height: 36px;
-  box-shadow: 0 0 6px rgba(0,0,0,0.3);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
+  position: absolute; top: 10px; left: 10px; z-index: 10;
+  background: white; border: none; border-radius: 4px;
+  width: 36px; height: 36px; box-shadow: 0 0 6px rgba(0,0,0,0.3);
+  cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
 }
-.custom-geolocate-btn svg {
-  width: 20px;
-  height: 20px;
-  fill: #333;
-}
-.custom-geolocate-btn.active svg {
-  fill: #0078d4;
-}
-
-.maplibregl-marker {
-  z-index: 99999 !important;
-}
+.custom-geolocate-btn svg { width: 20px; height: 20px; fill: #333; }
+.custom-geolocate-btn.active svg { fill: #0078d4; }
+.maplibregl-marker { z-index: 99999 !important; }
 
 #copyright {
   position:absolute; right:10px; bottom:10px;
@@ -100,7 +73,6 @@ html, body { margin:0; padding:0; height:100%; width:100%; font-size:18px; }
 <div id="map"></div>
 <div id="copyright">© 国土地理院</div>
 
-<!-- 自作の現在地ボタン -->
 <button id="geolocateBtn" class="custom-geolocate-btn" title="現在地">
   <svg viewBox="0 0 24 24"><path d="M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4Z"/></svg>
 </button>
@@ -116,51 +88,43 @@ html, body { margin:0; padding:0; height:100%; width:100%; font-size:18px; }
 
 <script>
 // コントロール開閉
+const header = document.getElementById("layerHeader");
 document.querySelector(".layer-control-header").onclick = () => {
   const content = document.querySelector(".layer-control-content");
-  const header = document.querySelector(".layer-control-header");
   const visible = content.style.display === "block";
   content.style.display = visible ? "none" : "block";
-  const current = header.dataset.title || "地理院地図";
-  header.textContent = visible ? `${current} ▼` : `${current} ▲`;
+  const title = header.dataset.title || "地理院地図";
+  header.textContent = `${title} ${visible ? "▼" : "▲"}`;
 };
 
 const markerFeatures = [];
 const polygonFeatures = [];
-let isMapLoaded = false;
-const imageCache = {};
-let activePopup = null;
-
-// レイヤー切り替え
+let isMapLoaded = false, imageCache = {}, activePopup = null;
 const copyright = document.getElementById("copyright");
+
 const copyrightMap = {
   gsi: "© 国土地理院",
-  gsi_pale: "© 国土地理院",
   esri: "© Esri, HERE, Garmin, FAO, NOAA, USGS",
   esri_sat: "© Esri, Maxar, Earthstar Geographics"
 };
 
-const header = document.getElementById("layerHeader");
-
+// レイヤー切り替え
 document.querySelectorAll("input[name=basemap]").forEach(r => {
   r.addEventListener("change", () => {
     const v = r.value;
     const nameMap = { gsi: "国土地理院", esri: "Esri地図", esri_sat: "Esri衛星" };
     header.dataset.title = nameMap[v];
-    const content = document.querySelector(".layer-control-content");
-    
-    // 選択時に強制的にリストを非同期で閉じ、表示を「▼」に戻す
-    content.style.display = "none";
+    document.querySelector(".layer-control-content").style.display = "none";
     header.textContent = `${nameMap[v]} ▼`;
-
     copyright.textContent = copyrightMap[v];
 
-    map.setLayoutProperty("gsi-map-layer", "visibility", v === "gsi" ? "visible" : "none");
-    map.setLayoutProperty("esri-map-layer", "visibility", v === "esri" ? "visible" : "none");
-    map.setLayoutProperty("esri-sat-layer", "visibility", v === "esri_sat" ? "visible" : "none");
+    ["gsi", "esri", "esri_sat"].forEach(layer => {
+      map.setLayoutProperty(`${layer}-map-layer`, "visibility", v === layer ? "visible" : "none");
+    });
   });
 });
 
+// マーカー画像生成
 function createMarkerImage(shape, text, textColor, bgColor, opacity = 1.0) {
   const cacheKey = `${shape}_${text}_${textColor}_${bgColor}_${opacity}`;
   if (imageCache[cacheKey]) return Promise.resolve(imageCache[cacheKey]);
@@ -170,8 +134,9 @@ function createMarkerImage(shape, text, textColor, bgColor, opacity = 1.0) {
     const shapeSvg = isTri 
       ? `<polygon points="24,4.5 45,43.5 3,43.5" fill="${bgColor}" fill-opacity="${opacity}" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" />`
       : `<circle cx="24" cy="24" r="21" fill="${bgColor}" fill-opacity="${opacity}" stroke="#ffffff" stroke-width="3" />`;
-    const textY = isTri ? 36 : 30;
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">${shapeSvg}<text x="24" y="${textY}" font-size="18" font-weight="bold" font-family="sans-serif" fill="${textColor}" text-anchor="middle">${text}</text></svg>`;
+    
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">${shapeSvg}<text x="24" y="${isTri ? 36 : 30}" font-size="18" font-weight="bold" font-family="sans-serif" fill="${textColor}" text-anchor="middle">${text}</text></svg>`;
+    
     const img = new Image();
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
     img.onload = () => {
@@ -189,22 +154,24 @@ function createMarkerImage(shape, text, textColor, bgColor, opacity = 1.0) {
 async function updateMarkerSource() {
   if (!window.map || !map.getSource("custom-markers-source")) return;
   const geojsonFeatures = [];
+  
   for (let i = 0; i < markerFeatures.length; i++) {
     const item = markerFeatures[i];
     const imgName = `marker-icon-${i}`;
-    const currentTextColor = item.currentTextColor || item.textColor;
-    const currentBgColor = item.currentBgColor || item.bgColor;
-    const cacheKey = `${item.shape}_${item.text}_${currentTextColor}_${currentBgColor}_${item.opacity}`;
+    const curText = item.currentTextColor || item.textColor;
+    const curBg = item.currentBgColor || item.bgColor;
+    const cacheKey = `${item.shape}_${item.text}_${curText}_${curBg}_${item.opacity}`;
+    
     if (!imageCache[cacheKey]) {
-      const imageData = await createMarkerImage(item.shape, item.text, currentTextColor, currentBgColor, item.opacity);
-      imageCache[cacheKey] = imageData;
+      imageCache[cacheKey] = await createMarkerImage(item.shape, item.text, curText, curBg, item.opacity);
     }
     if (!map.hasImage(imgName)) map.addImage(imgName, imageCache[cacheKey]);
     else map.updateImage(imgName, imageCache[cacheKey]);
+
     geojsonFeatures.push({
       type: "Feature",
       geometry: { type: "Point", coordinates: [item.lng, item.lat] },
-      properties: { index: i, iconName: imgName, popupTitle: item.popupTitle, popupText: item.popupText, showButtons: item.showButtons ?? true }
+      properties: { index: i, iconName: imgName }
     });
   }
   map.getSource("custom-markers-source").setData({ type: "FeatureCollection", features: geojsonFeatures });
@@ -213,7 +180,7 @@ async function updateMarkerSource() {
 function updatePolygonSource() {
   if (!window.map || !map.getSource("custom-polygons-source")) return;
   const geojsonFeatures = polygonFeatures.map(poly => {
-    const coords = [...poly.coordinates];
+    let coords = [...poly.coordinates];
     if (coords[0][0] !== coords[coords.length - 1][0] || coords[0][1] !== coords[coords.length - 1][1]) {
       coords.push([...coords[0]]);
     }
@@ -223,23 +190,15 @@ function updatePolygonSource() {
       properties: { color: poly.color || "#ff0000", fillOpacity: poly.fillOpacity ?? 0.3 }
     };
   });
-
   map.getSource("custom-polygons-source").setData({ type: "FeatureCollection", features: geojsonFeatures });
 }
 
-function addCircleMarker(lng, lat, text="", textColor = "#ffffff", bgColor = "#000000", popupTitle = "", popupText = "", opacity = 1.0, showButtons = true) {
-  markerFeatures.push({ 
-    shape: "circle", lng, lat, text: String(text), textColor, currentTextColor: textColor, bgColor, currentBgColor: bgColor, popupTitle, popupText, opacity, showButtons 
-  });
+function addMarker(shape, lng, lat, text="", textColor = "#ffffff", bgColor = "#000000", popupTitle = "", popupText = "", opacity = 1.0, showButtons = true) {
+  markerFeatures.push({ shape, lng, lat, text: String(text), textColor, currentTextColor: textColor, bgColor, currentBgColor: bgColor, popupTitle, popupText, opacity, showButtons });
   if (isMapLoaded) updateMarkerSource();
 }
-
-function addTriangleMarker(lng, lat, text="", textColor = "#ffffff", bgColor = "#ff0000", popupTitle = "", popupText = "", opacity = 1.0, showButtons = true) {
-  markerFeatures.push({ 
-    shape: "triangle", lng, lat, text: String(text), textColor, currentTextColor: textColor, bgColor, currentBgColor: bgColor, popupTitle, popupText, opacity, showButtons 
-  });
-  if (isMapLoaded) updateMarkerSource();
-}
+const addCircleMarker = (lng, lat, ...args) => addMarker("circle", lng, lat, ...args);
+const addTriangleMarker = (lng, lat, ...args) => addMarker("triangle", lng, lat, ...args);
 
 function addPolygon(coords, color = "#ff0000", fillOpacity = 0.3) {
   polygonFeatures.push({ coordinates: coords, color, fillOpacity });
@@ -262,16 +221,8 @@ window.map = new maplibregl.Map({
       { id: "esri-sat-layer", type: "raster", source: "esri-sat", layout: { visibility: "none" } }
     ]
   },
-  center: [137.157311, 34.925595],
-  zoom: 15,
-  maxZoom: 19,
-  maplibreLogo: false
+  center: [137.157311, 34.925595], zoom: 15, maxZoom: 19, maplibreLogo: false
 });
-
-// --- 現在地・追従ロジック ---
-let watchId = null;
-let isTracking = false;
-const btn = document.getElementById("geolocateBtn");
 
 map.on("load", () => {
   map.addSource("custom-polygons-source", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
@@ -281,28 +232,10 @@ map.on("load", () => {
   map.addSource("custom-markers-source", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
   map.addLayer({ id: "custom-markers-layer", type: "symbol", source: "custom-markers-source", layout: { "icon-image": ["get", "iconName"], "icon-allow-overlap": true, "icon-ignore-placement": true } });
 
-  map.addSource("user-location", {
-    type: "geojson",
-    data: { type: "FeatureCollection", features: [] }
-  });
-  map.addLayer({
-    id: "user-location-dot", 
-    type: "circle", 
-    source: "user-location",
-    paint: {
-      "circle-radius": 8,
-      "circle-color": "#2196F3",
-      "circle-stroke-width": 2,
-      "circle-stroke-color": "#ffffff"
-    }
-  });
+  map.addSource("user-location", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({ id: "user-location-dot", type: "circle", source: "user-location", paint: { "circle-radius": 8, "circle-color": "#2196F3", "circle-stroke-width": 2, "circle-stroke-color": "#ffffff" } });
 
-  map.on("click", "custom-markers-layer", (e) => {
-    const f = e.features[0];
-    const index = f.properties.index;
-    openMainPopup(index, f.geometry.coordinates[0], f.geometry.coordinates[1]);
-  });
-  
+  map.on("click", "custom-markers-layer", (e) => openMainPopup(e.features[0].properties.index));
   map.on("mouseenter", "custom-markers-layer", () => map.getCanvas().style.cursor = "pointer");
   map.on("mouseleave", "custom-markers-layer", () => map.getCanvas().style.cursor = "");
   
@@ -310,239 +243,144 @@ map.on("load", () => {
   if (pendingGasData) applyGasData(pendingGasData);
 });
 
-// 全マーカーとポリゴンが収まるように初期表示を自動調整する関数
 function fitMapBounds() {
   const bounds = new maplibregl.LngLatBounds();
   let hasData = false;
-
-  markerFeatures.forEach(m => {
-    bounds.extend([m.lng, m.lat]);
-    hasData = true;
-  });
-
-  polygonFeatures.forEach(p => {
-    if (p.coordinates && Array.isArray(p.coordinates)) {
-      p.coordinates.forEach(coord => {
-        bounds.extend(coord);
-        hasData = true;
-      });
-    }
-  });
-
-  if (hasData) {
-    map.fitBounds(bounds, {
-      padding: 50,
-      maxZoom: 17,
-      duration: 0
-    });
-  }
+  markerFeatures.forEach(m => { bounds.extend([m.lng, m.lat]); hasData = true; });
+  polygonFeatures.forEach(p => p.coordinates?.forEach(c => { bounds.extend(c); hasData = true; }));
+  if (hasData) map.fitBounds(bounds, { padding: 50, maxZoom: 17, duration: 0 });
 }
 
-// ポップアップが画面内に収まるように地図をパンさせるヘルパー関数
 function panMapToFitPopup() {
   setTimeout(() => {
     if (!activePopup) return;
-    const popupElement = activePopup.getElement();
-    if (!popupElement) return;
+    const popupRect = activePopup.getElement()?.getBoundingClientRect();
+    const mapRect = map.getContainer().getBoundingClientRect();
+    if (!popupRect) return;
 
-    const popupRect = popupElement.getBoundingClientRect();
-    const mapContainer = map.getContainer();
-    const mapRect = mapContainer.getBoundingClientRect();
+    let dx = 0, dy = 0, pad = 20;
+    if (popupRect.top < mapRect.top + pad) dy = popupRect.top - mapRect.top - pad;
+    else if (popupRect.bottom > mapRect.bottom - pad) dy = popupRect.bottom - mapRect.bottom + pad;
+    if (popupRect.left < mapRect.left + pad) dx = popupRect.left - mapRect.left - pad;
+    else if (popupRect.right > mapRect.right - pad) dx = popupRect.right - mapRect.right + pad;
 
-    let dx = 0;
-    let dy = 0;
-    const padding = 20;
-
-    if (popupRect.top < mapRect.top + padding) {
-      dy = popupRect.top - mapRect.top - padding;
-    } else if (popupRect.bottom > mapRect.bottom - padding) {
-      dy = popupRect.bottom - mapRect.bottom + padding;
-    }
-
-    if (popupRect.left < mapRect.left + padding) {
-      dx = popupRect.left - mapRect.left - padding;
-    } else if (popupRect.right > mapRect.right - padding) {
-      dx = popupRect.right - mapRect.right + padding;
-    }
-
-    if (dx !== 0 || dy !== 0) {
-      map.panBy([dx, dy], { duration: 300 });
-    }
+    if (dx || dy) map.panBy([dx, dy], { duration: 300 });
   }, 50);
 }
 
-// 元のポップアップを開く関数
-window.openMainPopup = function(index, lng, lat) {
+function showPopup(index, html) {
   const item = markerFeatures[index];
   if (!item) return;
+  if (activePopup) activePopup.remove();
+  activePopup = new maplibregl.Popup({ focusAfterOpen: false })
+    .setLngLat([item.lng, item.lat])
+    .setHTML(html);
+  activePopup.addTo(map);
+  panMapToFitPopup();
+}
 
-  const title = item.popupTitle;
-  const text = item.popupText;
-  let html = title ? `<strong>${title}</strong>` : "";
-  if (text) html += (html ? "<br>" : "") + text;
+window.openMainPopup = function(index) {
+  const item = markerFeatures[index];
+  let html = item.popupTitle ? `<strong>${item.popupTitle}</strong>` : "";
+  if (item.popupText) html += (html ? "<br>" : "") + item.popupText;
+  
   if (item.showButtons ?? true) {
     html += `
       <div class="popup-color-btns">
-        <button class="btn-green" onclick="changeMarkerTextColor(${index}, '#00ff00')">会えた</button>
-        <button class="btn-blue" onclick="changeMarkerTextColor(${index}, '#0000ff')">留守</button>
-        <button class="btn-yellow" onclick="changeMarkerTextColor(${index}, '#ffff00')">投函</button>
-        <button class="btn-reset" onclick="changeMarkerTextColor(${index}, 'reset')">未訪問</button>
+        <button class="btn-green" onclick="changeColor(${index}, 'text', '#00ff00')">会えた</button>
+        <button class="btn-blue" onclick="changeColor(${index}, 'text', '#0000ff')">留守</button>
+        <button class="btn-yellow" onclick="changeColor(${index}, 'text', '#ffff00')">投函</button>
+        <button class="btn-reset" onclick="changeColor(${index}, 'text', 'reset')">未訪問</button>
       </div>
-    `;
-    html += `
       <hr>
       <div style="margin-top: 6px; display: flex; justify-content: flex-end;">
-        <button onclick="openSubPopup(${index}, ${lng}, ${lat})" style="padding: 4px 10px; font-size: 16px; font-weight: bold; background: #f0f0f0; color: #000; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">備考</button>
+        <button onclick="openSubPopup(${index})" style="padding: 4px 10px; font-size: 16px; font-weight: bold; background: #f0f0f0; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">備考</button>
       </div>
     `;
   }
-
-  if (activePopup) activePopup.remove();
-  activePopup = new maplibregl.Popup({ focusAfterOpen: false })
-    .setLngLat([lng, lat])
-    .setHTML(html);
-  activePopup.addTo(map);
-
-  panMapToFitPopup();
+  showPopup(index, html);
 };
 
-window.changeMarkerTextColor = function(index, colorCode) {
+window.openSubPopup = function(index) {
   const item = markerFeatures[index];
-  if (!item) return;
-  item.currentTextColor = colorCode === 'reset' ? item.textColor : colorCode;
-  updateMarkerSource();
-};
-
-window.changeMarkerBgColor = function(index, colorCode) {
-  const item = markerFeatures[index];
-  if (!item) return;
-  item.currentBgColor = colorCode === 'reset' ? item.bgColor : colorCode;
-  updateMarkerSource();
-};
-
-window.openSubPopup = function(index, lng, lat) {
-  const item = markerFeatures[index];
-  if (!item) return;
-
-  let subHtml = item.popupTitle ? `<strong>${item.popupTitle}</strong>` : "";
-  if (item.popupText) subHtml += (subHtml ? "<br>" : "") + item.popupText;
+  let html = item.popupTitle ? `<strong>${item.popupTitle}</strong>` : "";
+  if (item.popupText) html += (html ? "<br>" : "") + item.popupText;
   
   if (item.showButtons ?? true) {
-    subHtml += `
+    html += `
       <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">特記事項</div>
       <div class="popup-color-btns">
-        <button class="btn-red" onclick="changeMarkerBgColor(${index}, '#ff0000')">*拒否</button>
-        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">手話</button>
-        <button class="btn-purple" onclick="changeMarkerBgColor(${index}, '#800080')">JW</button>
-        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">空家</button>
-        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">倉庫</button>
-        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">欠番</button>
-        <button class="btn-bg-reset" onclick="changeMarkerBgColor(${index}, 'reset')">情報の削除</button>
+        <button class="btn-red" onclick="changeColor(${index}, 'bg', '#ff0000')">*拒否</button>
+        <button class="btn-orange" onclick="changeColor(${index}, 'bg', '#ff9900')">手話</button>
+        <button class="btn-purple" onclick="changeColor(${index}, 'bg', '#800080')">JW</button>
+        <button class="btn-orange" onclick="changeColor(${index}, 'bg', '#ff9900')">空家</button>
+        <button class="btn-orange" onclick="changeColor(${index}, 'bg', '#ff9900')">倉庫</button>
+        <button class="btn-orange" onclick="changeColor(${index}, 'bg', '#ff9900')">欠番</button>
+        <button class="btn-bg-reset" onclick="changeColor(${index}, 'bg', 'reset')">情報の削除</button>
       </div>
       <hr>
-      <!-- 言語選択用セレクトボックス -->
       <div style="margin-top: 8px;">
-        <label for="langSelect-${index}" style="font-size: 14px; font-weight: bold; display: block; margin-bottom: 4px;">言語の選択</label>
-        <select id="langSelect-${index}" onchange="handleLangChange(${index}, this.value)" style="width: 100%; padding: 6px; font-size: 16px; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">
+        <label style="font-size: 14px; font-weight: bold; display: block; margin-bottom: 4px;">言語の選択</label>
+        <select onchange="changeColor(${index}, 'bg', this.value)" style="width: 100%; padding: 6px; font-size: 16px; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">
           <option value="" selected>報告しない</option>
-          <option value="#ff9900">英語</option>
-          <option value="#ff9900">中国語</option>
-          <option value="#ff9900">ポル語</option>
-          <option value="#ff9900">スぺ語</option>
-          <option value="#ff9900">タガ語</option>
-          <option value="#ff9900">ベト語</option>
-          <option value="#ff9900">他の言語</option>
-          <option value="reset">削除（日本語）</option>
+          <option value="#ff9900">英語</option><option value="#ff9900">中国語</option><option value="#ff9900">ポル語</option>
+          <option value="#ff9900">スぺ語</option><option value="#ff9900">タガ語</option><option value="#ff9900">ベト語</option>
+          <option value="#ff9900">他の言語</option><option value="reset">削除（日本語）</option>
         </select>
       </div>
     `;
   }
 
-  // 備考の編集欄（自動リサイズ・手動リサイズ禁止）
-  const currentText = item.popupText || "";
-  subHtml += `
+  html += `
     <hr>
     <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">備考の編集</div>
-    <textarea id="editPopupText-${index}" oninput="autoResizeTextarea(this)" style="width: 100%; min-height: 40px; font-size: 14px; padding: 4px; box-sizing: border-box; resize: none; overflow: hidden;">${currentText}</textarea>
-    <div style="margin-top: 6px;">
-      <button onclick="savePopupText(${index})" style="padding: 4px 10px; font-size: 16px; font-weight: bold; background: #0078d4; color: #fff; border: none; border-radius: 3px; cursor: pointer;">保存</button>
-    </div>
+    <textarea id="editText-${index}" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" style="width: 100%; min-height: 40px; font-size: 14px; padding: 4px; box-sizing: border-box; resize: none; overflow: hidden;">${item.popupText || ""}</textarea>
+    <div style="margin-top: 6px;"><button onclick="saveText(${index})" style="padding: 4px 10px; font-size: 16px; font-weight: bold; background: #0078d4; color: #fff; border: none; border-radius: 3px; cursor: pointer;">保存</button></div>
     <hr>
     <div style="margin-top: 6px; display: flex; justify-content: flex-end;">
-      <button onclick="openMainPopup(${index}, ${lng}, ${lat})" style="padding: 4px 10px; font-size: 16px; font-weight: bold; background: #f0f0f0; color: #000; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">戻る</button>
+      <button onclick="openMainPopup(${index})" style="padding: 4px 10px; font-size: 16px; font-weight: bold; background: #f0f0f0; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">戻る</button>
     </div>
   `;
-
-  if (activePopup) activePopup.remove();
-
-  activePopup = new maplibregl.Popup({ focusAfterOpen: false })
-    .setLngLat([lng, lat])
-    .setHTML(subHtml);
-
-  activePopup.addTo(map);
-
-  // ポップアップが開いた直後、初期テキストの高さに合わせて高さを調整し、画面内に収まるようパンする
+  showPopup(index, html);
   setTimeout(() => {
-    const ta = document.getElementById(`editPopupText-${index}`);
-    if (ta) autoResizeTextarea(ta);
-    panMapToFitPopup();
+    const ta = document.getElementById(`editText-${index}`);
+    if (ta) ta.style.height = ta.scrollHeight + 'px';
   }, 50);
 };
 
-// セレクトボックスで言語が変更されたときの処理
-window.handleLangChange = function(index, colorCode) {
-  changeMarkerBgColor(index, colorCode);
-};
-
-// テキストエリアの高さを自動調整する関数
-window.autoResizeTextarea = function(el) {
-  el.style.height = 'auto';
-  el.style.height = (el.scrollHeight) + 'px';
-};
-
-// 編集した備考を保存する関数
-window.savePopupText = function(index) {
+window.changeColor = function(index, type, code) {
   const item = markerFeatures[index];
   if (!item) return;
-  const textarea = document.getElementById(`editPopupText-${index}`);
-  if (textarea) {
-    item.popupText = textarea.value;
+  if (type === 'text') item.currentTextColor = code === 'reset' ? item.textColor : code;
+  if (type === 'bg') item.currentBgColor = code === 'reset' ? item.bgColor : code;
+  updateMarkerSource();
+};
+
+window.saveText = function(index) {
+  const ta = document.getElementById(`editText-${index}`);
+  if (ta) {
+    markerFeatures[index].popupText = ta.value;
     updateMarkerSource();
     alert("備考を保存しました");
   }
 };
 
+// 現在地・追従
+let watchId = null, isTracking = false;
+const btn = document.getElementById("geolocateBtn");
+
 btn.addEventListener("click", () => {
   if (!isTracking) {
-    if (!navigator.geolocation) {
-      alert("お使いのブラウザは位置情報に対応していません。");
-      return;
-    }
+    if (!navigator.geolocation) return alert("位置情報に対応していません。");
     isTracking = true;
     btn.classList.add("active");
     watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        const lng = position.coords.longitude;
-        const lat = position.coords.latitude;
-        const source = map.getSource("user-location");
-        if (source) {
-          source.setData({
-            type: "FeatureCollection",
-            features: [{
-              type: "Feature",
-              geometry: { type: "Point", coordinates: [lng, lat] },
-              properties: {}
-            }]
-          });
-        }
-        const currentZoom = map.getZoom();
-        map.easeTo({ center: [lng, lat], zoom: currentZoom, duration: 300 });
+      pos => {
+        const coords = [pos.coords.longitude, pos.coords.latitude];
+        map.getSource("user-location")?.setData({ type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Point", coordinates: coords }, properties: {} }] });
+        map.easeTo({ center: coords, zoom: map.getZoom(), duration: 300 });
       },
-      (error) => {
-        console.error(error);
-        alert("位置情報の取得に失敗しました。");
-        stopTracking();
-      },
+      () => { alert("位置情報の取得に失敗しました。"); stopTracking(); },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
     );
   } else {
@@ -553,34 +391,21 @@ btn.addEventListener("click", () => {
 function stopTracking() {
   isTracking = false;
   btn.classList.remove("active");
-  if (watchId !== null) {
-    navigator.geolocation.clearWatch(watchId);
-    watchId = null;
-  }
-  const source = map.getSource("user-location");
-  if (source) {
-    source.setData({ type: "FeatureCollection", features: [] });
-  }
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  map.getSource("user-location")?.setData({ type: "FeatureCollection", features: [] });
 }
 
+// データ読み込み（GAS / ダミー）
 let pendingGasData = null;
 function applyGasData(data) {
   if (data.title) document.title = data.title;
-  if (data.markers) {
-    data.markers.forEach(m => {
-      if (m.shape === "triangle") addTriangleMarker(m.lng, m.lat, m.text, m.textColor, m.bgColor, m.popupTitle, m.popupText, m.opacity, m.showButtons);
-      else addCircleMarker(m.lng, m.lat, m.text, m.textColor, m.bgColor, m.popupTitle, m.popupText, m.opacity, m.showButtons);
-    });
-  }
-  if (data.polygons) {
-    data.polygons.forEach(p => addPolygon(p.coords, p.color, p.opacity));
-  }
+  data.markers?.forEach(m => addMarker(m.shape || "circle", m.lng, m.lat, m.text, m.textColor, m.bgColor, m.popupTitle, m.popupText, m.opacity, m.showButtons));
+  data.polygons?.forEach(p => addPolygon(p.coords, p.color, p.opacity));
   fitMapBounds();
 }
 
 async function loadDataFromGAS() {
   const GAS_URL = "YOUR_GAS_WEB_APP_URL_HERE";
-
   if (!GAS_URL || GAS_URL.includes("YOUR_GAS_WEB_APP_URL")) {
     pendingGasData = {
       title: "【ダミーデータ】岡崎市エリアマップ",
@@ -597,11 +422,9 @@ async function loadDataFromGAS() {
     if (isMapLoaded) applyGasData(pendingGasData);
     return;
   }
-
   try {
     const res = await fetch(GAS_URL);
-    const data = await res.json();
-    pendingGasData = data;
+    pendingGasData = await res.json();
     if (isMapLoaded) applyGasData(pendingGasData);
   } catch (err) {
     console.error("GASデータの取得に失敗しました:", err);
