@@ -338,6 +338,39 @@ function fitMapBounds() {
   }
 }
 
+// ポップアップが画面内に収まるように地図をパンさせるヘルパー関数
+function panMapToFitPopup() {
+  setTimeout(() => {
+    if (!activePopup) return;
+    const popupElement = activePopup.getElement();
+    if (!popupElement) return;
+
+    const popupRect = popupElement.getBoundingClientRect();
+    const mapContainer = map.getContainer();
+    const mapRect = mapContainer.getBoundingClientRect();
+
+    let dx = 0;
+    let dy = 0;
+    const padding = 20;
+
+    if (popupRect.top < mapRect.top + padding) {
+      dy = popupRect.top - mapRect.top - padding;
+    } else if (popupRect.bottom > mapRect.bottom - padding) {
+      dy = popupRect.bottom - mapRect.bottom + padding;
+    }
+
+    if (popupRect.left < mapRect.left + padding) {
+      dx = popupRect.left - mapRect.left - padding;
+    } else if (popupRect.right > mapRect.right - padding) {
+      dx = popupRect.right - mapRect.right + padding;
+    }
+
+    if (dx !== 0 || dy !== 0) {
+      map.panBy([dx, dy], { duration: 300 });
+    }
+  }, 50);
+}
+
 // 元のポップアップを開く関数
 window.openMainPopup = function(index, lng, lat) {
   const item = markerFeatures[index];
@@ -369,6 +402,8 @@ window.openMainPopup = function(index, lng, lat) {
     .setLngLat([lng, lat])
     .setHTML(html);
   activePopup.addTo(map);
+
+  panMapToFitPopup();
 };
 
 window.changeMarkerTextColor = function(index, colorCode) {
@@ -446,10 +481,11 @@ window.openSubPopup = function(index, lng, lat) {
 
   activePopup.addTo(map);
 
-  // ポップアップが開いた直後、初期テキストの高さに合わせて高さを調整
+  // ポップアップが開いた直後、初期テキストの高さに合わせて高さを調整し、画面内に収まるようパンする
   setTimeout(() => {
     const ta = document.getElementById(`editPopupText-${index}`);
     if (ta) autoResizeTextarea(ta);
+    panMapToFitPopup();
   }, 50);
 };
 
