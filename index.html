@@ -359,7 +359,7 @@ window.openMainPopup = function(index, lng, lat) {
     html += `
       <hr>
       <div style="margin-top: 6px; display: flex; justify-content: flex-end;">
-        <button onclick="openSubPopup(${index}, ${lng}, ${lat})" style="padding: 4px 10px; font-size: 12px; background: #f0f0f0; color: #333; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">備考の編集</button>
+        <button onclick="openSubPopup(${index}, ${lng}, ${lat})" style="padding: 4px 10px; font-size: 16px; font-weight: bold; background: #f0f0f0; color: #000; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">備考</button>
       </div>
     `;
   }
@@ -430,11 +430,11 @@ window.openSubPopup = function(index, lng, lat) {
     <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">備考の編集</div>
     <textarea id="editPopupText-${index}" oninput="autoResizeTextarea(this)" style="width: 100%; min-height: 40px; font-size: 14px; padding: 4px; box-sizing: border-box; resize: none; overflow: hidden;">${currentText}</textarea>
     <div style="margin-top: 6px;">
-      <button onclick="savePopupText(${index})" style="padding: 4px 10px; font-size: 12px; background: #0078d4; color: #fff; border: none; border-radius: 3px; cursor: pointer;">保存</button>
+      <button onclick="savePopupText(${index})" style="padding: 4px 10px; font-size: 16px; font-weight: bold; background: #0078d4; color: #fff; border: none; border-radius: 3px; cursor: pointer;">保存</button>
     </div>
     <hr>
     <div style="margin-top: 6px; display: flex; justify-content: flex-end;">
-      <button onclick="openMainPopup(${index}, ${lng}, ${lat})" style="padding: 4px 10px; font-size: 12px; background: #f0f0f0; color: #333; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">戻る</button>
+      <button onclick="openMainPopup(${index}, ${lng}, ${lat})" style="padding: 4px 10px; font-size: 16px; font-weight: bold; background: #f0f0f0; color: #000; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">戻る</button>
     </div>
   `;
 
