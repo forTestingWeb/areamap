@@ -26,7 +26,7 @@ html, body { margin:0; padding:0; height:100%; width:100%; font-size:18px; }
 .layer-control label { display:block; margin-bottom:6px; cursor:pointer; }
 
 .maplibregl-popup { max-width:320px !important; }
-.maplibregl-popup-content { font-size:16px; max-height:300px; overflow-y:auto; padding:15px 10px 10px 10px; }
+.maplibregl-popup-content { font-size:16px; max-height:600px; overflow-y:auto; padding:15px 10px 10px 10px; }
 
 /* ポップアップ内のカラーボタン用スタイル */
 .popup-color-btns {
@@ -44,12 +44,12 @@ html, body { margin:0; padding:0; height:100%; width:100%; font-size:18px; }
   font-weight: bold;
 }
 .btn-green { background: #00ff00; color: #000000; border-color: #1e7e34; }
-.btn-blue { background: #0000ff; color: #000000; border-color: #0056b3; }
+.btn-blue { background: #0000ff; color: #ffffff; border-color: #0056b3; }
 .btn-yellow { background: #ffff00; color: #000000; border-color: #d39e00; }
 .btn-reset { background: #ffffff; color: #333333; border-color: #ccc; }
 
 .btn-red { background: #ff0000; color: #ffffff; border-color: #cc0000; }
-.btn-orange { background: #ff9900; color: #ffffff; border-color: #cc7a00; }
+.btn-orange { background: #ff9900; color: #000000; border-color: #cc7a00; }
 .btn-purple { background: #800080; color: #ffffff; border-color: #590059; }
 .btn-bg-reset { background: #ffffff; color: #333333; border-color: #ccc; }
 
@@ -84,7 +84,6 @@ html, body { margin:0; padding:0; height:100%; width:100%; font-size:18px; }
   fill: #0078d4;
 }
 
-/* ベクトルタイル等のレイヤーに埋もれないよう、現在地マーカー等のz-indexを強制的に最上位にする */
 .maplibregl-marker {
   z-index: 99999 !important;
 }
@@ -99,7 +98,7 @@ html, body { margin:0; padding:0; height:100%; width:100%; font-size:18px; }
 
 <body>
 <div id="map"></div>
-<div id="copyright">© Esri, HERE, Garmin, FAO, NOAA, USGS</div>
+<div id="copyright">© 国土地理院</div>
 
 <!-- 自作の現在地ボタン -->
 <button id="geolocateBtn" class="custom-geolocate-btn" title="現在地">
@@ -107,11 +106,11 @@ html, body { margin:0; padding:0; height:100%; width:100%; font-size:18px; }
 </button>
 
 <div class="layer-control">
-  <div class="layer-control-header" id="layerHeader">Esri地図 ▼</div>
+  <div class="layer-control-header" id="layerHeader">国土地理院 ▼</div>
   <div class="layer-control-content">
-    <label><input type="radio" name="basemap" value="esri" checked> Esri地図</label>
-    <label><input type="radio" name="basemap" value="gsi"> 国土地理院</label>
-    <label><input type="radio" name="basemap" value="esri_sat_label"> Esri衛星</label>
+    <label><input type="radio" name="basemap" value="gsi" checked> 国土地理院</label>
+    <label><input type="radio" name="basemap" value="esri"> Esri地図</label>
+    <label><input type="radio" name="basemap" value="esri_sat"> Esri衛星</label>
   </div>
 </div>
 
@@ -122,137 +121,40 @@ document.querySelector(".layer-control-header").onclick = () => {
   const header = document.querySelector(".layer-control-header");
   const visible = content.style.display === "block";
   content.style.display = visible ? "none" : "block";
-  const current = header.dataset.title || "Esri地図";
+  const current = header.dataset.title || "国土地理院";
   header.textContent = visible ? `${current} ▼` : `${current} ▲`;
 };
 
 const markerFeatures = [];
 const polygonFeatures = [];
 let isMapLoaded = false;
-let gsiLayerIds = [];
-let esriSatLabelIds = [];
-let isGsiLoaded = false;
-let isGsiLoading = false;
 const imageCache = {};
 let activePopup = null;
-
-// 国土地理院タイル遅延・切り替え読み込み関数（等高線・道路中心線除外版）
-async function ensureGsiVectorTilesLoaded(styleUrl = "https://gsi-cyberjapan.github.io/gsivectortile-mapbox-gl-js/std.json") {
-  if (isGsiLoaded && currentGsiStyleUrl === styleUrl) return;
-  if (isGsiLoading) return;
-
-  isGsiLoading = true;
-
-  try {
-    // 既存の国土地理院レイヤーを綺麗に削除
-    gsiLayerIds.forEach(id => { if (map.getLayer(id)) map.removeLayer(id); });
-    esriSatLabelIds.forEach(id => { if (map.getLayer(id)) map.removeLayer(id); });
-    gsiLayerIds = [];
-    esriSatLabelIds = [];
-
-    const res = await fetch(styleUrl);
-    const styleJson = await res.json();
-    currentGsiStyleUrl = styleUrl;
-
-    // ソースの追加
-    Object.keys(styleJson.sources).forEach(srcId => {
-      if (!map.getSource(srcId)) {
-        const cfg = styleJson.sources[srcId];
-        cfg.maxzoom = 18;
-        map.addSource(srcId, cfg);
-      }
-    });
-
-    if (styleJson.sprite) map.setSprite(styleJson.sprite);
-    if (styleJson.glyphs) map.setGlyphs(styleJson.glyphs);
-
-// スタイルのレイヤーをループして追加（等高線と道路中心線のみを除外）
-styleJson.layers.forEach(layer => {
-      const id = layer.id;
-      const sourceLayer = layer["source-layer"] || "";
-      const path = layer.metadata && layer.metadata.path ? layer.metadata.path : "";
-
-      // ▼【ちょうどいい除外フィルター】等高線と道路中心線(rdcl)、および細かすぎる一部の交通レイヤーのみ
-      if (
-        // 等高線系
-        id.includes("contour") || sourceLayer.includes("contour") ||
-        // 道路中心線データ
-        sourceLayer === "RdCL" || id.includes("RdCL") ||
-        // 道路の中にある細い境界線やマーキングなどの特定パス（必要に応じて調整）
-        path.includes("道路-道路属性") || path.includes("道路-中央分離帯") 
-      ) {
-        return; // このレイヤーは追加しない
-      }
-
-      // 通常の国土地理院レイヤーとして追加
-      if (!map.getLayer(layer.id)) {
-        const l = { ...layer, layout: { ...(layer.layout || {}), visibility: "none" } };
-        delete l.maxzoom;
-        gsiLayerIds.push(layer.id);
-        if (map.getLayer("custom-polygons-fill")) {
-          map.addLayer(l, "custom-polygons-fill");
-        } else {
-          map.addLayer(l);
-        }
-      }
-
-      // Esri衛星用に文字ラベル（symbol）だけを別IDで重ねる用として保持
-      if (layer.type === "symbol") {
-        const labelId = "esri-sat-label-" + layer.id;
-        if (!map.getLayer(labelId)) {
-          const labelLayer = { ...layer, id: labelId, layout: { ...(layer.layout || {}), visibility: "none" } };
-          delete labelLayer.maxzoom;
-          esriSatLabelIds.push(labelId);
-          if (map.getLayer("custom-polygons-fill")) {
-            map.addLayer(labelLayer, "custom-polygons-fill");
-          } else {
-            map.addLayer(labelLayer);
-          }
-        }
-      }
-    });
-  isGsiLoaded = true;
-  } catch (err) {
-    console.error("国土地理院タイル読み込み失敗:", err);
-  } finally {
-    isGsiLoading = false;
-  }
-}
-
-function setGroupVisibility(ids, show) {
-  const vis = show ? "visible" : "none";
-  ids.forEach(id => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", vis); });
-}
 
 // レイヤー切り替え
 const copyright = document.getElementById("copyright");
 const copyrightMap = {
-  esri: "© Esri, HERE, Garmin, FAO, NOAA, USGS",
   gsi: "© 国土地理院",
-  esri_sat_label: "© Esri, Maxar, Earthstar Geographics ＋ © 国土地理院"
+  gsi_pale: "© 国土地理院",
+  esri: "© Esri, HERE, Garmin, FAO, NOAA, USGS",
+  esri_sat: "© Esri, Maxar, Earthstar Geographics"
 };
+
 const header = document.getElementById("layerHeader");
 
 document.querySelectorAll("input[name=basemap]").forEach(r => {
-  r.addEventListener("change", async () => {
+  r.addEventListener("change", () => {
     const v = r.value;
-    const nameMap = { esri: "Esri 地図", gsi: "国土地理院", esri_sat_label: "Esri衛星" };
+    const nameMap = { gsi: "国土地理院", esri: "Esri 地図", esri_sat: "Esri衛星" };
     header.dataset.title = nameMap[v];
     const content = document.querySelector(".layer-control-content");
     const visible = content.style.display === "block";
     header.textContent = visible ? `${nameMap[v]} ▲` : `${nameMap[v]} ▼`;
     copyright.textContent = copyrightMap[v];
 
-    if ((v === "gsi" || v === "esri_sat_label") && !isGsiLoaded) {
-      await ensureGsiVectorTilesLoaded();
-    }
-
+    map.setLayoutProperty("gsi-map-layer", "visibility", v === "gsi" ? "visible" : "none");
     map.setLayoutProperty("esri-map-layer", "visibility", v === "esri" ? "visible" : "none");
-    map.setLayoutProperty("esri-sat-layer", "visibility", v === "esri_sat_label" ? "visible" : "none");
-    
-    // 国土地理院地図のときは全体を表示、Esri衛星のときは文字ラベルのみを表示
-    setGroupVisibility(gsiLayerIds, v === "gsi");
-    setGroupVisibility(esriSatLabelIds, v === "esri_sat_label");
+    map.setLayoutProperty("esri-sat-layer", "visibility", v === "esri_sat" ? "visible" : "none");
   });
 });
 
@@ -347,11 +249,13 @@ window.map = new maplibregl.Map({
   style: {
     version: 8,
     sources: {
-      "esri-map": { type: "raster", tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, maxzoom: 19 },
+      "gsi-map": { type: "raster", tiles: ["https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 18 },
+      "esri-map": { type: "raster", tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, maxzoom: 19 },
       "esri-sat": { type: "raster", tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, maxzoom: 19 }
     },
     layers: [
-      { id: "esri-map-layer", type: "raster", source: "esri-map" },
+      { id: "gsi-map-layer", type: "raster", source: "gsi-map" },
+      { id: "esri-map-layer", type: "raster", source: "esri-map", layout: { visibility: "none" } },
       { id: "esri-sat-layer", type: "raster", source: "esri-sat", layout: { visibility: "none" } }
     ]
   },
@@ -393,31 +297,7 @@ map.on("load", () => {
   map.on("click", "custom-markers-layer", (e) => {
     const f = e.features[0];
     const index = f.properties.index;
-    const title = f.properties.popupTitle;
-    const text = f.properties.popupText;
-    let html = title ? `<strong>${title}</strong>` : "";
-    if (text) html += (html ? "<br>" : "") + text;
-    if (f.properties.showButtons) {
-      html += `
-        <div class="popup-color-btns">
-          <button class="btn-green" onclick="changeMarkerTextColor(${index}, '#00ff00')">会えた</button>
-          <button class="btn-blue" onclick="changeMarkerTextColor(${index}, '#0000ff')">留守</button>
-          <button class="btn-yellow" onclick="changeMarkerTextColor(${index}, '#ffff00')">投函</button>
-          <button class="btn-reset" onclick="changeMarkerTextColor(${index}, 'reset')">未訪問</button>
-        </div>
-      `;
-      html += `
-        <div style="margin-top: 10px;">
-          <button onclick="openSubPopup(${index}, ${f.geometry.coordinates[0]}, ${f.geometry.coordinates[1]})" style="padding: 4px 8px; font-size: 12px; cursor: pointer;">備考の編集</button>
-        </div>
-      `;
-    }
-
-    if (activePopup) activePopup.remove();
-    activePopup = new maplibregl.Popup({ focusAfterOpen: false })
-      .setLngLat(f.geometry.coordinates)
-      .setHTML(html);
-    activePopup.addTo(map);
+    openMainPopup(index, f.geometry.coordinates[0], f.geometry.coordinates[1]);
   });
   
   map.on("mouseenter", "custom-markers-layer", () => map.getCanvas().style.cursor = "pointer");
@@ -426,6 +306,38 @@ map.on("load", () => {
   isMapLoaded = true;
   if (pendingGasData) applyGasData(pendingGasData);
 });
+
+// 元のポップアップを開く関数
+window.openMainPopup = function(index, lng, lat) {
+  const item = markerFeatures[index];
+  if (!item) return;
+
+  const title = item.popupTitle;
+  const text = item.popupText;
+  let html = title ? `<strong>${title}</strong>` : "";
+  if (text) html += (html ? "<br>" : "") + text;
+  if (item.showButtons ?? true) {
+    html += `
+      <div class="popup-color-btns">
+        <button class="btn-green" onclick="changeMarkerTextColor(${index}, '#00ff00')">会えた</button>
+        <button class="btn-blue" onclick="changeMarkerTextColor(${index}, '#0000ff')">留守</button>
+        <button class="btn-yellow" onclick="changeMarkerTextColor(${index}, '#ffff00')">投函</button>
+        <button class="btn-reset" onclick="changeMarkerTextColor(${index}, 'reset')">未訪問</button>
+      </div>
+    `;
+    html += `
+      <div style="margin-top: 10px;">
+        <button onclick="openSubPopup(${index}, ${lng}, ${lat})" style="padding: 4px 8px; font-size: 12px; cursor: pointer;">備考の編集</button>
+      </div>
+    `;
+  }
+
+  if (activePopup) activePopup.remove();
+  activePopup = new maplibregl.Popup({ focusAfterOpen: false })
+    .setLngLat([lng, lat])
+    .setHTML(html);
+  activePopup.addTo(map);
+};
 
 window.changeMarkerTextColor = function(index, colorCode) {
   const item = markerFeatures[index];
@@ -452,14 +364,38 @@ window.openSubPopup = function(index, lng, lat) {
     subHtml += `
       <div class="popup-color-btns">
         <button class="btn-red" onclick="changeMarkerBgColor(${index}, '#ff0000')">拒否</button>
-        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">備考あり</button>
+        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">手話</button>
         <button class="btn-purple" onclick="changeMarkerBgColor(${index}, '#800080')">JW</button>
-        <button class="btn-bg-reset" onclick="changeMarkerBgColor(${index}, 'reset')">元に戻す</button>
+        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">空家</button>
+        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">倉庫</button>
+        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">欠番</button>
+        <button class="btn-bg-reset" onclick="changeMarkerBgColor(${index}, 'reset')">情報の削除</button>
+        <br><span>
+        <br>
+        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">英語</button>
+        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">中国語</button>
+        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">ポル語</button>
+        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">スぺ語</button>
+        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">タガ語</button>
+        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">ベト語</button>
+        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">その他の言語</button>
+        <button class="btn-bg-reset" onclick="changeMarkerBgColor(${index}, 'reset')">言語情報の削除</button>
       </div>
     `;
   }
 
-  subHtml += `<div style="margin-top: 10px; font-size: 14px; color: #555;">(詳細情報・カラー変更)</div>`;
+  // 備考の編集欄（自動リサイズ・手動リサイズ禁止）
+  const currentText = item.popupText || "";
+  subHtml += `
+    <div style="margin-top: 12px; border-top: 1px solid #ddd; padding-top: 8px;">
+      <div style="font-size: 13px; font-weight: bold; margin-bottom: 4px;">備考の編集</div>
+      <textarea id="editPopupText-${index}" oninput="autoResizeTextarea(this)" style="width: 100%; min-height: 40px; font-size: 14px; padding: 4px; box-sizing: border-box; resize: none; overflow: hidden;">${currentText}</textarea>
+      <div style="margin-top: 6px; display: flex; justify-content: space-between; align-items: center;">
+        <button onclick="savePopupText(${index})" style="padding: 4px 10px; font-size: 12px; background: #0078d4; color: #fff; border: none; border-radius: 3px; cursor: pointer;">保存</button>
+        <button onclick="openMainPopup(${index}, ${lng}, ${lat})" style="padding: 4px 10px; font-size: 12px; background: #f0f0f0; color: #333; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">戻る</button>
+      </div>
+    </div>
+  `;
 
   if (activePopup) activePopup.remove();
 
@@ -468,6 +404,30 @@ window.openSubPopup = function(index, lng, lat) {
     .setHTML(subHtml);
 
   activePopup.addTo(map);
+
+  // ポップアップが開いた直後、初期テキストの高さに合わせて高さを調整
+  setTimeout(() => {
+    const ta = document.getElementById(`editPopupText-${index}`);
+    if (ta) autoResizeTextarea(ta);
+  }, 50);
+};
+
+// テキストエリアの高さを自動調整する関数
+window.autoResizeTextarea = function(el) {
+  el.style.height = 'auto';
+  el.style.height = (el.scrollHeight) + 'px';
+};
+
+// 編集した備考を保存する関数
+window.savePopupText = function(index) {
+  const item = markerFeatures[index];
+  if (!item) return;
+  const textarea = document.getElementById(`editPopupText-${index}`);
+  if (textarea) {
+    item.popupText = textarea.value;
+    updateMarkerSource();
+    alert("備考を保存しました");
+  }
 };
 
 btn.addEventListener("click", () => {
@@ -540,7 +500,7 @@ async function loadDataFromGAS() {
 
   if (!GAS_URL || GAS_URL.includes("YOUR_GAS_WEB_APP_URL")) {
     pendingGasData = {
-      title: "【ダミーデータ】岡崎市エリアマップ",
+      title: "【ダミーデータ】",
       markers: [
         { shape: "circle", lng: 137.157311, lat: 34.925595, text: "101", textColor: "#ffffff", bgColor: "#000000", popupTitle: "ポップアップ1", popupText: "丸型マーカーのダミーテキスト", opacity: 0.5, showButtons: true },
         { shape: "triangle", lng: 137.160000, lat: 34.927000, text: "AA", textColor: "#ffffff", bgColor: "#ff0000", popupTitle: "ポップアップ2", popupText: "三角マーカーのダミーテキスト", opacity: 1.0, showButtons: false }
