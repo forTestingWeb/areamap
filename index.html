@@ -32,12 +32,12 @@ html, body { margin:0; padding:0; height:100%; width:100%; font-size:18px; }
 .popup-color-btns {
   margin-top: 8px;
   display: flex;
-  gap: 4px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 .popup-color-btns button {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: 16px;
   border: 1px solid #ccc;
   border-radius: 3px;
   cursor: pointer;
@@ -326,8 +326,9 @@ window.openMainPopup = function(index, lng, lat) {
       </div>
     `;
     html += `
-      <div style="margin-top: 10px;">
-        <button onclick="openSubPopup(${index}, ${lng}, ${lat})" style="padding: 4px 8px; font-size: 12px; cursor: pointer;">備考の編集</button>
+      <hr>
+      <div style="margin-top: 6px; display: flex; justify-content: flex-end;">
+        <button onclick="openSubPopup(${index}, ${lng}, ${lat})" style="padding: 4px 10px; font-size: 12px; background: #f0f0f0; color: #333; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">備考の編集</button>
       </div>
     `;
   }
@@ -362,24 +363,31 @@ window.openSubPopup = function(index, lng, lat) {
   
   if (item.showButtons ?? true) {
     subHtml += `
+      <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">特記事項</div>
       <div class="popup-color-btns">
-        <button class="btn-red" onclick="changeMarkerBgColor(${index}, '#ff0000')">拒否</button>
+        <button class="btn-red" onclick="changeMarkerBgColor(${index}, '#ff0000')">*拒否</button>
         <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">手話</button>
         <button class="btn-purple" onclick="changeMarkerBgColor(${index}, '#800080')">JW</button>
         <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">空家</button>
         <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">倉庫</button>
         <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">欠番</button>
         <button class="btn-bg-reset" onclick="changeMarkerBgColor(${index}, 'reset')">情報の削除</button>
-        <br><span>
-        <br>
-        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">英語</button>
-        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">中国語</button>
-        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">ポル語</button>
-        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">スぺ語</button>
-        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">タガ語</button>
-        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">ベト語</button>
-        <button class="btn-orange" onclick="changeMarkerBgColor(${index}, '#ff9900')">その他の言語</button>
-        <button class="btn-bg-reset" onclick="changeMarkerBgColor(${index}, 'reset')">言語情報の削除</button>
+      </div>
+      <hr>
+      <!-- 言語選択用セレクトボックス -->
+      <div style="margin-top: 8px;">
+        <label for="langSelect-${index}" style="font-size: 14px; font-weight: bold; display: block; margin-bottom: 4px;">言語の選択</label>
+        <select id="langSelect-${index}" onchange="handleLangChange(${index}, this.value)" style="width: 100%; padding: 6px; font-size: 16px; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">
+          <option value="" selected>報告しない（今の言語を維持）</option>
+          <option value="#ff9900">英語</option>
+          <option value="#ff9900">中国語</option>
+          <option value="#ff9900">ポル語</option>
+          <option value="#ff9900">スぺ語</option>
+          <option value="#ff9900">タガ語</option>
+          <option value="#ff9900">ベト語</option>
+          <option value="#ff9900">他の言語</option>
+          <option value="reset">削除（日本語）</option>
+        </select>
       </div>
     `;
   }
@@ -387,13 +395,14 @@ window.openSubPopup = function(index, lng, lat) {
   // 備考の編集欄（自動リサイズ・手動リサイズ禁止）
   const currentText = item.popupText || "";
   subHtml += `
-    <div style="margin-top: 12px; border-top: 1px solid #ddd; padding-top: 8px;">
-      <div style="font-size: 13px; font-weight: bold; margin-bottom: 4px;">備考の編集</div>
-      <textarea id="editPopupText-${index}" oninput="autoResizeTextarea(this)" style="width: 100%; min-height: 40px; font-size: 14px; padding: 4px; box-sizing: border-box; resize: none; overflow: hidden;">${currentText}</textarea>
-      <div style="margin-top: 6px; display: flex; justify-content: space-between; align-items: center;">
-        <button onclick="savePopupText(${index})" style="padding: 4px 10px; font-size: 12px; background: #0078d4; color: #fff; border: none; border-radius: 3px; cursor: pointer;">保存</button>
-        <button onclick="openMainPopup(${index}, ${lng}, ${lat})" style="padding: 4px 10px; font-size: 12px; background: #f0f0f0; color: #333; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">戻る</button>
-      </div>
+    <hr>
+    <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">備考の編集</div>
+    <textarea id="editPopupText-${index}" oninput="autoResizeTextarea(this)" style="width: 100%; min-height: 40px; font-size: 14px; padding: 4px; box-sizing: border-box; resize: none; overflow: hidden;">${currentText}</textarea>
+    <div style="margin-top: 6px;">
+      <button onclick="savePopupText(${index})" style="padding: 4px 10px; font-size: 12px; background: #0078d4; color: #fff; border: none; border-radius: 3px; cursor: pointer;">保存</button>
+    <hr>
+    <div style="margin-top: 6px; display: flex; justify-content: flex-end;">
+      <button onclick="openMainPopup(${index}, ${lng}, ${lat})" style="padding: 4px 10px; font-size: 12px; background: #f0f0f0; color: #333; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">戻る</button>
     </div>
   `;
 
@@ -410,6 +419,11 @@ window.openSubPopup = function(index, lng, lat) {
     const ta = document.getElementById(`editPopupText-${index}`);
     if (ta) autoResizeTextarea(ta);
   }, 50);
+};
+
+// セレクトボックスで言語が変更されたときの処理
+window.handleLangChange = function(index, colorCode) {
+  changeMarkerBgColor(index, colorCode);
 };
 
 // テキストエリアの高さを自動調整する関数
@@ -500,7 +514,7 @@ async function loadDataFromGAS() {
 
   if (!GAS_URL || GAS_URL.includes("YOUR_GAS_WEB_APP_URL")) {
     pendingGasData = {
-      title: "【ダミーデータ】",
+      title: "【ダミーデータ】岡崎市エリアマップ",
       markers: [
         { shape: "circle", lng: 137.157311, lat: 34.925595, text: "101", textColor: "#ffffff", bgColor: "#000000", popupTitle: "ポップアップ1", popupText: "丸型マーカーのダミーテキスト", opacity: 0.5, showButtons: true },
         { shape: "triangle", lng: 137.160000, lat: 34.927000, text: "AA", textColor: "#ffffff", bgColor: "#ff0000", popupTitle: "ポップアップ2", popupText: "三角マーカーのダミーテキスト", opacity: 1.0, showButtons: false }
