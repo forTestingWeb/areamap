@@ -128,12 +128,6 @@ function jump() {
 
     let loaded = false;
 
-    window.addEventListener("message", (event) => {
-      if (event.data.type === "NAVIGATE_EMBED") {
-      document.getElementById("embed").src = event.data.url;
-      }
-    });
-
     /* ------------------------------
        GAS 側からの LOADED 通知を受け取る
        ------------------------------ */
