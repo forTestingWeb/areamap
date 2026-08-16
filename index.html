@@ -140,13 +140,19 @@ function jump() {
     });
 
     /* ------------------------------
-       タイムアウト（10秒）
+       load後10秒後にloadedがtrueになっていなければ（TITLEを受け取っていなければ）、確認後ページ遷移。
        ------------------------------ */
-    setTimeout(() => {
-      if (!loaded) {
-        window.top.location.href = src;
-      }
-    }, 10000);
+    iframe.onload = () => {
+      if (iframe.src === "about:blank") return;
+      setTimeout(() => {
+        if (!loaded) {
+          const sw = confirm("動作していないようです。直接読み込みますか？その場合、上下に警告メッセージが出ますが無視してください。");
+          if (sw) {
+            window.top.location.href = src;
+          }
+        }
+      }, 10000);
+    };
   }
 
   /* ------------------------------
